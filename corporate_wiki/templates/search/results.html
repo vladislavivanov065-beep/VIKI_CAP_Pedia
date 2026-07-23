@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Поиск: {{ query }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Результаты поиска</h1>
+        <form method="get" action="{% url 'search:search' %}" role="search">
+            <div class="form-row">
+                <input type="search" name="q" value="{{ query }}" placeholder="Поиск по базе знаний">
+                <button type="submit" class="button--primary">Найти</button>
+            </div>
+        </form>
+
+        {% if query %}
+            <p class="text-secondary">
+                {% if results %}Найдено статей: {{ results|length }}{% else %}Ничего не найдено по запросу «{{ query }}».{% endif %}
+            </p>
+            <ul class="search-results">
+                {% for item in results %}
+                    <li class="search-results__item">
+                        <a href="{% url 'articles:detail' slug=item.article.slug %}">{{ item.article.title }}</a>
+                        <p class="text-secondary">{{ item.snippet }}</p>
+                        <p class="text-secondary">
+                            Изменено {{ item.article.updated_at|date:"d.m.Y H:i" }}
+                            {% if item.revision %}автор — {{ item.revision.edited_by.display_name }}{% endif %}
+                        </p>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">Введите поисковый запрос.</p>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -3,7 +3,7 @@
         <h2 class="sidebar__heading">Навигация</h2>
         <ul class="sidebar__list">
             <li><a href="{% url 'home' %}">Главная страница</a></li>
-            <li><a href="/search/">Поиск по статьям</a></li>
+            <li><a href="{% url 'search:search' %}">Поиск по статьям</a></li>
             <li><a href="{% url 'articles:create' %}">Создать статью</a></li>
         </ul>
     </div>

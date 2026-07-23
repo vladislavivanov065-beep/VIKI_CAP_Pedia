@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.articles",
     "apps.images",
+    "apps.search",
 ]
 
 MIDDLEWARE = [
