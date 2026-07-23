@@ -143,3 +143,50 @@ def test_extract_toc_html_matches_render_time_toc():
 def test_extract_toc_html_empty_when_no_headings():
     html, _toc = render_article_content("Просто текст без заголовков.")
     assert extract_toc_html(html) == ""
+
+
+def test_image_embed_renders_figure_with_src():
+    from io import BytesIO
+
+    from apps.images import services
+    from apps.images.tests.factories import make_image_bytes
+
+    user = UserFactory()
+    image = services.upload_article_image(
+        file_obj=BytesIO(make_image_bytes()),
+        original_filename="a.png",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"![[image:{image.pk}]]")
+    assert f'src="/images/{image.pk}/"' in html
+    assert "<figure>" in html
+
+
+def test_image_embed_with_caption():
+    from io import BytesIO
+
+    from apps.images import services
+    from apps.images.tests.factories import make_image_bytes
+
+    user = UserFactory()
+    image = services.upload_article_image(
+        file_obj=BytesIO(make_image_bytes()),
+        original_filename="a.png",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"![[image:{image.pk}|Подпись к фото]]")
+    assert "<figcaption>Подпись к фото</figcaption>" in html
+
+
+def test_image_embed_missing_uuid_shows_placeholder():
+    html, _toc = render_article_content("![[image:00000000-0000-0000-0000-000000000000]]")
+    assert "изображение не найдено" in html
+    assert "wiki-link-missing" in html
+
+
+def test_image_embed_does_not_get_treated_as_wikilink():
+    html, _toc = render_article_content("![[image:not-a-real-uuid]]")
+    assert "<img" not in html
+    assert "изображение не найдено" in html

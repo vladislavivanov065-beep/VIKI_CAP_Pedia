@@ -25,6 +25,7 @@ from markdown.treeprocessors import Treeprocessor
 
 WIKILINK_UUID_RE = r"\[\[article:([^\|\]]+)(?:\|([^\]]+))?\]\]"
 WIKILINK_TITLE_RE = r"\[\[(?!article:)([^\|\]]+)(?:\|([^\]]+))?\]\]"
+IMAGE_EMBED_RE = r"!\[\[image:([^\|\]]+)(?:\|([^\]]+))?\]\]"
 STRIKETHROUGH_RE = r"(~~)(.*?)~~"
 
 _INTERNAL_LINK_CLASSES = {"wiki-link", "wiki-link-missing", "wiki-link-archived"}
@@ -56,13 +57,19 @@ SANITIZE_TAGS = {
     "h6",
     "a",
     "img",
+    "figure",
+    "figcaption",
+    "span",
 }
 SANITIZE_ATTRIBUTES = {
     "a": {"href", "title", "target"},
     "img": {"src", "alt", "title"},
     **{f"h{level}": {"id"} for level in range(1, 7)},
 }
-SANITIZE_CLASSES = {"a": _INTERNAL_LINK_CLASSES | {"external-link"}}
+SANITIZE_CLASSES = {
+    "a": _INTERNAL_LINK_CLASSES | {"external-link"},
+    "span": {"wiki-link-missing"},
+}
 SANITIZE_URL_SCHEMES = {"http", "https", "mailto"}
 
 
@@ -121,6 +128,36 @@ class WikiLinkByTitleInlineProcessor(InlineProcessor):
         return anchor, m.start(0), m.end(0)
 
 
+class ImageEmbedInlineProcessor(InlineProcessor):
+    """``![[image:UUID]]`` / ``![[image:UUID|Caption]]`` (section 6.7)."""
+
+    def handleMatch(self, m, data):
+        from apps.images.models import ArticleImage
+
+        raw_uuid = m.group(1).strip()
+        caption_override = (m.group(2) or "").strip()
+
+        try:
+            image = ArticleImage.objects.get(pk=raw_uuid)
+        except (ArticleImage.DoesNotExist, ValueError, ValidationError):
+            missing = etree.Element("span")
+            missing.text = "[изображение не найдено]"
+            missing.set("class", "wiki-link-missing")
+            return missing, m.start(0), m.end(0)
+
+        figure = etree.Element("figure")
+        img = etree.SubElement(figure, "img")
+        img.set("src", f"/images/{image.pk}/")
+        img.set("alt", image.alt_text or caption_override or image.caption)
+
+        caption_text = caption_override or image.caption
+        if caption_text:
+            figcaption = etree.SubElement(figure, "figcaption")
+            figcaption.text = caption_text
+
+        return figure, m.start(0), m.end(0)
+
+
 class ExternalLinkTreeprocessor(Treeprocessor):
     """Marks plain ``[text](url)`` links to other domains as external."""
 
@@ -145,6 +182,9 @@ class CorporateWikiExtension(Extension):
     """Wiki-links, strikethrough, and external-link marking in one place."""
 
     def extendMarkdown(self, md):
+        md.inlinePatterns.register(
+            ImageEmbedInlineProcessor(IMAGE_EMBED_RE, md), "image_embed", 177
+        )
         md.inlinePatterns.register(
             WikiLinkByUuidInlineProcessor(WIKILINK_UUID_RE, md), "wikilink_uuid", 176
         )

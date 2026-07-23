@@ -513,6 +513,23 @@ a.external-link::after {
     color: var(--text-secondary);
 }
 
+.article-body figure {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.article-body figure img {
+    max-width: 100%;
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+}
+
+.article-body figcaption {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 0.4rem;
+}
+
 .toc {
     float: left;
     max-width: 320px;

@@ -38,7 +38,10 @@
                 </div>
             </div>
 
+            <input type="file" data-image-input accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+
             <div class="form-row">
+                <button type="button" class="button" data-image-upload>Добавить изображение</button>
                 <button type="button" class="button" data-preview-target="article-preview">Предпросмотр</button>
                 <button type="submit" class="button--primary">Опубликовать</button>
                 <a class="button" href="{% url 'home' %}">Отмена</a>
