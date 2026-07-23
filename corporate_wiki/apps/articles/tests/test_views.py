@@ -202,3 +202,95 @@ def test_link_suggestions_includes_article_id_for_editor_wikilinks(client):
 
     entries = {a["title"]: a["id"] for a in response.json()["articles"]}
     assert entries["CardsPro"] == str(article.pk)
+
+
+def test_archive_requires_staff(client):
+    user = UserFactory(must_change_password=False, is_staff=False)
+    client.force_login(user)
+    article = services.create_article(title="Статья", content_source="x", created_by=user)
+
+    response = client.post(reverse("articles:archive", kwargs={"slug": article.slug}))
+
+    assert response.status_code == 403
+    article.refresh_from_db()
+    assert article.is_archived is False
+
+
+def test_archive_requires_post(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = services.create_article(title="Статья", content_source="x", created_by=admin)
+
+    response = client.get(reverse("articles:archive", kwargs={"slug": article.slug}))
+
+    assert response.status_code == 405
+
+
+def test_staff_can_archive_article(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = services.create_article(title="Статья", content_source="x", created_by=admin)
+
+    response = client.post(reverse("articles:archive", kwargs={"slug": article.slug}))
+
+    assert response.status_code == 302
+    article.refresh_from_db()
+    assert article.is_archived is True
+    assert article.archived_by == admin
+
+
+def test_archived_article_shows_delete_button_only_to_staff(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    regular = UserFactory(must_change_password=False, is_staff=False)
+    article = services.create_article(title="Статья", content_source="x", created_by=admin)
+
+    client.force_login(regular)
+    response = client.get(reverse("articles:detail", kwargs={"slug": article.slug}))
+    assert "Удалить" not in response.content.decode()
+
+    client.force_login(admin)
+    response = client.get(reverse("articles:detail", kwargs={"slug": article.slug}))
+    assert "Удалить" in response.content.decode()
+
+
+def test_unarchive_requires_staff(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    user = UserFactory(must_change_password=False, is_staff=False)
+    article = services.create_article(title="Статья", content_source="x", created_by=admin)
+    services.archive_article(article_id=article.pk, actor=admin)
+
+    client.force_login(user)
+    response = client.post(reverse("articles:unarchive", kwargs={"slug": article.slug}))
+
+    assert response.status_code == 403
+    article.refresh_from_db()
+    assert article.is_archived is True
+
+
+def test_staff_can_unarchive_article(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    article = services.create_article(title="Статья", content_source="x", created_by=admin)
+    services.archive_article(article_id=article.pk, actor=admin)
+
+    client.force_login(admin)
+    response = client.post(reverse("articles:unarchive", kwargs={"slug": article.slug}))
+
+    assert response.status_code == 302
+    article.refresh_from_db()
+    assert article.is_archived is False
+
+
+def test_unarchive_with_title_conflict_shows_error_and_stays_archived(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    article = services.create_article(title="Дубликат", content_source="x", created_by=admin)
+    services.archive_article(article_id=article.pk, actor=admin)
+    services.create_article(title="Дубликат", content_source="y", created_by=admin)
+
+    client.force_login(admin)
+    response = client.post(
+        reverse("articles:unarchive", kwargs={"slug": article.slug}), follow=True
+    )
+
+    assert "уже существует" in response.content.decode()
+    article.refresh_from_db()
+    assert article.is_archived is True

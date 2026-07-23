@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -253,4 +254,40 @@ def article_restore(request, slug: str, revision_number: int):
         return redirect("articles:revision_detail", slug=slug, revision_number=revision_number)
 
     messages.success(request, f"Версия №{revision_number} восстановлена.")
+    return redirect("articles:detail", slug=article.slug)
+
+
+@require_POST
+def article_archive(request, slug: str):
+    # Archiving is an administrator-only action (section 3.2) — physical
+    # deletion of an article is never allowed through the UI at all.
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    article = get_object_or_404(Article, slug=slug, is_archived=False)
+    services.archive_article(
+        article_id=article.pk,
+        actor=request.user,
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+    )
+    messages.success(request, "Статья перенесена в архив.")
+    return redirect("articles:detail", slug=article.slug)
+
+
+@require_POST
+def article_unarchive(request, slug: str):
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    article = get_object_or_404(Article, slug=slug, is_archived=True)
+    try:
+        services.restore_article(
+            article_id=article.pk,
+            actor=request.user,
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+    except ArticleTitleConflict as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Статья восстановлена из архива.")
     return redirect("articles:detail", slug=article.slug)

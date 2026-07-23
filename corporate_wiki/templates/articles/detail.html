@@ -7,6 +7,12 @@
         <div class="messages">
             <p style="padding: 0.6rem 0.9rem; border-radius: 4px; background: #fde7e9; border: 1px solid #ba0000;">
                 Эта статья архивирована и не отображается в поиске и основном списке.
+                {% if user.is_staff %}
+                    <form method="post" action="{% url 'articles:unarchive' slug=article.slug %}" style="display: inline; margin-left: 0.5rem;">
+                        {% csrf_token %}
+                        <button type="submit" class="button">Восстановить из архива</button>
+                    </form>
+                {% endif %}
             </p>
         </div>
     {% endif %}
@@ -23,6 +29,12 @@
                 <a class="button button--primary" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
                 <a class="button" href="{% url 'articles:edit' slug=article.slug %}">Редактировать</a>
                 <a class="button" href="{% url 'articles:detail' slug=article.slug %}?view=source">Посмотреть код</a>
+                {% if user.is_staff and not article.is_archived %}
+                    <form method="post" action="{% url 'articles:archive' slug=article.slug %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="button button--danger">Удалить</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
         <p class="text-secondary">

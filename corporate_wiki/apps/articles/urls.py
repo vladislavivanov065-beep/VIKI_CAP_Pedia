@@ -21,4 +21,6 @@ urlpatterns = [
         views.article_restore,
         name="restore",
     ),
+    path("<str:slug>/archive/", views.article_archive, name="archive"),
+    path("<str:slug>/unarchive/", views.article_unarchive, name="unarchive"),
 ]

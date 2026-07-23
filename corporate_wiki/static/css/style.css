@@ -385,6 +385,17 @@ button[type="submit"]:hover {
     opacity: 0.92;
 }
 
+.button--danger,
+button.button--danger[type="submit"] {
+    background: var(--link-missing);
+    border-color: var(--link-missing);
+    color: #fff;
+}
+
+.button--danger:hover {
+    opacity: 0.92;
+}
+
 /* ---------------------------------------------------------------- */
 /* Messages                                                          */
 /* ---------------------------------------------------------------- */
