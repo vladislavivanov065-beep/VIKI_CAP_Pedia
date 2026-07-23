@@ -17,7 +17,30 @@
         textarea.focus();
     }
 
-    function uploadImage(file, altText, caption, textarea, onDone) {
+    // Builds "![[image:UUID]]" / "![[image:UUID|Caption]]" /
+    // "![[image:UUID|Caption|align=left;size=medium]]" depending on which
+    // options differ from the defaults (no float, full width) — keeps the
+    // markdown minimal when the user didn't touch the layout controls.
+    function buildImageMarkdown(imageId, caption, align, size) {
+        var options = [];
+        if (align && align !== "none") {
+            options.push("align=" + align);
+        }
+        if (size && size !== "full") {
+            options.push("size=" + size);
+        }
+
+        var body = "image:" + imageId;
+        if (caption || options.length) {
+            body += "|" + (caption || "");
+        }
+        if (options.length) {
+            body += "|" + options.join(";");
+        }
+        return "![[" + body + "]]";
+    }
+
+    function uploadImage(file, altText, caption, align, size, textarea, onDone) {
         var formData = new FormData();
         formData.append("file", file);
         formData.append("alt_text", altText || "");
@@ -35,9 +58,7 @@
             })
             .then(function (result) {
                 if (result.ok) {
-                    var snippet = caption
-                        ? "![[image:" + result.data.id + "|" + caption + "]]"
-                        : result.data.markdown;
+                    var snippet = buildImageMarkdown(result.data.id, caption, align, size);
                     insertAtCursor(textarea, snippet + "\n");
                 } else {
                     window.alert(result.data.error || "Не удалось загрузить изображение.");
@@ -96,6 +117,8 @@
         var filenameLabel = panel.querySelector("[data-image-filename]");
         var altInput = panel.querySelector("[data-image-alt]");
         var captionInput = panel.querySelector("[data-image-caption]");
+        var alignSelect = panel.querySelector("[data-image-align]");
+        var sizeSelect = panel.querySelector("[data-image-size]");
         var confirmButton = panel.querySelector("[data-image-confirm]");
         var cancelButton = panel.querySelector("[data-image-cancel]");
         var pendingFile = null;
@@ -105,6 +128,12 @@
             filenameLabel.textContent = file.name;
             altInput.value = guessAltFromFilename(file.name);
             captionInput.value = "";
+            if (alignSelect) {
+                alignSelect.value = "none";
+            }
+            if (sizeSelect) {
+                sizeSelect.value = "medium";
+            }
             panel.hidden = false;
             altInput.focus();
         }
@@ -152,11 +181,21 @@
                 }
                 altInput.setCustomValidity("");
                 var file = pendingFile;
+                var align = alignSelect ? alignSelect.value : "none";
+                var size = sizeSelect ? sizeSelect.value : "full";
                 confirmButton.disabled = true;
-                uploadImage(file, altInput.value.trim(), captionInput.value.trim(), textarea, function () {
-                    confirmButton.disabled = false;
-                    closePanel();
-                });
+                uploadImage(
+                    file,
+                    altInput.value.trim(),
+                    captionInput.value.trim(),
+                    align,
+                    size,
+                    textarea,
+                    function () {
+                        confirmButton.disabled = false;
+                        closePanel();
+                    }
+                );
             });
         }
 

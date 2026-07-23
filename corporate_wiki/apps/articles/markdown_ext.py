@@ -25,10 +25,48 @@ from markdown.treeprocessors import Treeprocessor
 
 WIKILINK_UUID_RE = r"\[\[article:([^\|\]]+)(?:\|([^\]]+))?\]\]"
 WIKILINK_TITLE_RE = r"\[\[(?!article:)([^\|\]]+)(?:\|([^\]]+))?\]\]"
-IMAGE_EMBED_RE = r"!\[\[image:([^\|\]]+)(?:\|([^\]]+))?\]\]"
+# Third segment carries layout options as "key=value;key=value", e.g.
+# ![[image:UUID|Caption|align=left;size=medium]] — see IMAGE_ALIGN_CLASSES/
+# IMAGE_SIZE_CLASSES below for the allowed values.
+IMAGE_EMBED_RE = r"!\[\[image:([^\|\]]+)(?:\|([^\|\]]*))?(?:\|([^\]]+))?\]\]"
 STRIKETHROUGH_RE = r"(~~)(.*?)~~"
 
 _INTERNAL_LINK_CLASSES = {"wiki-link", "wiki-link-missing", "wiki-link-archived"}
+
+# Layout "constructor" options for embedded images (section 6.7 extension).
+# Deliberately a fixed set of CSS classes rather than free-form inline
+# styles/widths, both so nh3's class allowlist stays meaningful and so a
+# malformed/unknown option can never produce a broken or huge image.
+IMAGE_ALIGN_CLASSES = {
+    "left": "wiki-image--align-left",
+    "right": "wiki-image--align-right",
+    "center": "wiki-image--align-center",
+}
+IMAGE_SIZE_CLASSES = {
+    "small": "wiki-image--size-small",
+    "medium": "wiki-image--size-medium",
+    "large": "wiki-image--size-large",
+    "full": "wiki-image--size-full",
+}
+
+
+def _parse_image_options(raw_options: str) -> list[str]:
+    """``"align=left;size=medium"`` -> CSS classes, unknown keys/values
+    silently ignored so a hand-edited or stale option string never breaks
+    rendering."""
+    classes = []
+    for pair in raw_options.split(";"):
+        if "=" not in pair:
+            continue
+        key, _, value = pair.partition("=")
+        key = key.strip().lower()
+        value = value.strip().lower()
+        if key == "align" and value in IMAGE_ALIGN_CLASSES:
+            classes.append(IMAGE_ALIGN_CLASSES[value])
+        elif key == "size" and value in IMAGE_SIZE_CLASSES:
+            classes.append(IMAGE_SIZE_CLASSES[value])
+    return classes
+
 
 SANITIZE_TAGS = {
     "p",
@@ -69,6 +107,7 @@ SANITIZE_ATTRIBUTES = {
 SANITIZE_CLASSES = {
     "a": _INTERNAL_LINK_CLASSES | {"external-link"},
     "span": {"wiki-link-missing"},
+    "figure": set(IMAGE_ALIGN_CLASSES.values()) | set(IMAGE_SIZE_CLASSES.values()),
 }
 SANITIZE_URL_SCHEMES = {"http", "https", "mailto"}
 
@@ -129,13 +168,15 @@ class WikiLinkByTitleInlineProcessor(InlineProcessor):
 
 
 class ImageEmbedInlineProcessor(InlineProcessor):
-    """``![[image:UUID]]`` / ``![[image:UUID|Caption]]`` (section 6.7)."""
+    """``![[image:UUID]]`` / ``![[image:UUID|Caption]]`` /
+    ``![[image:UUID|Caption|align=left;size=medium]]`` (section 6.7)."""
 
     def handleMatch(self, m, data):
         from apps.images.models import ArticleImage
 
         raw_uuid = m.group(1).strip()
         caption_override = (m.group(2) or "").strip()
+        layout_classes = _parse_image_options(m.group(3) or "")
 
         try:
             image = ArticleImage.objects.get(pk=raw_uuid)
@@ -146,6 +187,8 @@ class ImageEmbedInlineProcessor(InlineProcessor):
             return missing, m.start(0), m.end(0)
 
         figure = etree.Element("figure")
+        if layout_classes:
+            figure.set("class", " ".join(layout_classes))
         img = etree.SubElement(figure, "img")
         img.set("src", f"/images/{image.pk}/")
         img.set("alt", image.alt_text or caption_override or image.caption)
