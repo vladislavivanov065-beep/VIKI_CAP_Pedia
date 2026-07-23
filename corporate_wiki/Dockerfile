@@ -17,7 +17,11 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
 
 COPY . /app/
-RUN chmod +x /app/entrypoint.sh
+# Strip any CRLF line endings a Windows checkout may have introduced —
+# a carriage return right after "#!/bin/sh" makes the kernel look for a
+# literal "/bin/sh\r" interpreter and fail with "no such file or directory".
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
+    && chmod +x /app/entrypoint.sh
 
 RUN mkdir -p /app/data /app/staticfiles
 
