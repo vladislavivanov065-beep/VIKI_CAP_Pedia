@@ -61,3 +61,69 @@ def test_get_user_contributions_returns_only_that_users_revisions():
     contributions = selectors.get_user_contributions(alice)
     assert contributions.count() == 1
     assert contributions.first().edited_by == alice
+
+
+def test_sidebar_list_with_blank_query_returns_all_active_articles_sorted():
+    user = UserFactory()
+    services.create_article(title="Ж-статья", content_source="x", created_by=user)
+    services.create_article(title="А-статья", content_source="x", created_by=user)
+    archived = services.create_article(title="Архивная", content_source="x", created_by=user)
+    services.archive_article(article_id=archived.pk, actor=user)
+
+    results = selectors.find_articles_for_sidebar_list("")
+
+    titles = [a.title for a in results]
+    assert titles == ["А-статья", "Ж-статья"]
+
+
+def test_sidebar_list_filters_by_title():
+    user = UserFactory()
+    match = services.create_article(title="CardsPro", content_source="x", created_by=user)
+    services.create_article(title="Отпускные правила", content_source="x", created_by=user)
+
+    results = selectors.find_articles_for_sidebar_list("cardspro")
+
+    assert results == [match]
+
+
+def test_sidebar_list_filters_by_content():
+    user = UserFactory()
+    match = services.create_article(
+        title="Статья", content_source="Уникальное слово жирафоид.", created_by=user
+    )
+    services.create_article(title="Другая статья", content_source="Обычный текст.", created_by=user)
+
+    results = selectors.find_articles_for_sidebar_list("жирафоид")
+
+    assert results == [match]
+
+
+def test_sidebar_list_requires_all_words_to_match():
+    user = UserFactory()
+    both = services.create_article(
+        title="Карты и деньги", content_source="выпуск карт клиентам", created_by=user
+    )
+    services.create_article(title="Только деньги", content_source="бюджет отдела", created_by=user)
+
+    results = selectors.find_articles_for_sidebar_list("карты деньги")
+
+    assert results == [both]
+
+
+def test_sidebar_list_is_cyrillic_case_insensitive():
+    user = UserFactory()
+    match = services.create_article(title="ОТПУСКНЫЕ ПРАВИЛА", content_source="x", created_by=user)
+
+    results = selectors.find_articles_for_sidebar_list("отпускные")
+
+    assert results == [match]
+
+
+def test_sidebar_list_excludes_archived_articles():
+    user = UserFactory()
+    article = services.create_article(title="Статья про кошек", content_source="x", created_by=user)
+    services.archive_article(article_id=article.pk, actor=user)
+
+    results = selectors.find_articles_for_sidebar_list("кошек")
+
+    assert results == []

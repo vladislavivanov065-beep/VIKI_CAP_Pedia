@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ article.title }} — {{ site_name }}{% endblock %}
 
@@ -57,4 +58,37 @@
             </div>
         {% endif %}
     </div>
+{% endblock %}
+
+{% block content_rail %}
+    {% if not article.is_archived %}
+        <div class="content-card rail-block">
+            <h2 class="rail-block__title">Рекомендуемые статьи</h2>
+            {% if similar_articles %}
+                <ul class="rail-block__list">
+                    {% for related in similar_articles %}
+                        <li><a href="{% url 'articles:detail' slug=related.slug %}">{{ related.title }}</a></li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-secondary">Похожих статей пока не найдено.</p>
+            {% endif %}
+        </div>
+
+        <div class="content-card rail-block">
+            <h2 class="rail-block__title">Задай свой вопрос</h2>
+            <form class="ask-question-form" data-ask-question-form>
+                <label for="ask-question-input" class="visually-hidden">Ваш вопрос</label>
+                <textarea id="ask-question-input" name="question" rows="3" placeholder="Например: как оформить перевыпуск карты?"></textarea>
+                <button type="submit" class="button button--primary">Спросить</button>
+                <p class="text-secondary ask-question-form__note" data-ask-question-note hidden>
+                    Ответы на вопросы появятся здесь позже — эта функция ещё в разработке.
+                </p>
+            </form>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/ask-question.js' %}"></script>
 {% endblock %}

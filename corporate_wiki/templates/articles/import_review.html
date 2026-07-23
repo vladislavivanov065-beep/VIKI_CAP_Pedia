@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Проверка блоков импорта — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Проверка блоков импорта</h1>
+        {% if filename %}
+            <p class="text-secondary">Документ: {{ filename }}</p>
+        {% endif %}
+
+        {% if not entries %}
+            <p>Все блоки обработаны.</p>
+            <a class="button" href="{% url 'articles:import_upload' %}">Импортировать ещё документ</a>
+        {% else %}
+            <p class="text-secondary">
+                Для каждого блока выберите: добавить статью как есть, отредактировать и добавить,
+                или пропустить.
+            </p>
+
+            <div class="import-review__list">
+                {% for entry in entries %}
+                    <div class="content-card import-review__block">
+                        <form method="post"
+                              action="{% url 'articles:import_process_block' block_id=entry.id %}"
+                              class="import-review__form">
+                            {% csrf_token %}
+                            <div class="form-row">
+                                <label for="import-title-{{ entry.id }}">Заголовок статьи</label>
+                                <input type="text" id="import-title-{{ entry.id }}" name="title"
+                                       value="{{ entry.title }}" maxlength="255">
+                            </div>
+                            <div class="form-row">
+                                <label for="import-content-{{ entry.id }}">Текст статьи (Markdown)</label>
+                                <textarea id="import-content-{{ entry.id }}" name="content"
+                                          rows="8">{{ entry.content }}</textarea>
+                            </div>
+                            <div class="form-row import-review__actions">
+                                <button type="submit" name="action" value="add" class="button--primary">
+                                    Добавить статью
+                                </button>
+                                <button type="submit" name="action" value="edit_add" class="button">
+                                    Отредактировать и добавить
+                                </button>
+                                <button type="submit" name="action" value="skip" class="button--danger">
+                                    Не добавлять
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

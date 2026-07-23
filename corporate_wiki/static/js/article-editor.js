@@ -126,12 +126,26 @@
         return out;
     }
 
+    // Matches the "\U0001f4ce " (📎) prefix AttachmentEmbedInlineProcessor
+    // always prepends server-side — stripped back out before
+    // re-serializing so round-tripping an attachment link never
+    // accumulates a second paperclip on top of the first.
+    var ATTACHMENT_ICON_PREFIX = "📎 ";
+
     function serializeLink(anchor) {
         var display = serializeInline(anchor) || anchor.textContent || "";
         var articleId = anchor.getAttribute("data-wiki-article-id");
         var uuid = anchor.getAttribute("data-wiki-uuid");
         var title = anchor.getAttribute("data-wiki-title");
+        var attachmentId = anchor.getAttribute("data-attachment-id");
 
+        if (attachmentId) {
+            var attachmentDisplay = stripSyntaxDelimiters(display);
+            if (attachmentDisplay.indexOf(ATTACHMENT_ICON_PREFIX) === 0) {
+                attachmentDisplay = attachmentDisplay.slice(ATTACHMENT_ICON_PREFIX.length);
+            }
+            return "[[attachment:" + attachmentId + "|" + attachmentDisplay + "]]";
+        }
         if (articleId) {
             return "[[article:" + articleId + "|" + stripSyntaxDelimiters(display) + "]]";
         }
@@ -611,6 +625,111 @@
         }
     }
 
+    function insertFragmentAtSelection(surface, fragment) {
+        surface.focus();
+        var selection = window.getSelection();
+        var range;
+        if (selection && selection.rangeCount > 0 && surface.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+            range = selection.getRangeAt(0);
+        } else {
+            range = document.createRange();
+            range.selectNodeContents(surface);
+            range.collapse(false);
+        }
+        range.deleteContents();
+        var lastNode = fragment.lastChild;
+        range.insertNode(fragment);
+        if (lastNode) {
+            range.setStartAfter(lastNode);
+            range.collapse(true);
+            if (selection) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * Paste sanitizing: pasted HTML (e.g. a table copied from Excel/
+     * Google Sheets, or formatted text from Word) can carry a lot of
+     * markup our serializer doesn't understand and don't want to store —
+     * inline styles, classes, colgroups, mso-* junk. Rebuild pasted
+     * content from scratch using only the tags the serializer already
+     * knows how to turn into Markdown, so a paste behaves exactly like
+     * typing the same content by hand.
+     * ------------------------------------------------------------------ */
+
+    var PASTE_KEEP_TAGS = {
+        p: 1, div: 1, h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+        strong: 1, b: 1, em: 1, i: 1, u: 1, del: 1, s: 1, code: 1, br: 1,
+        ul: 1, ol: 1, li: 1, blockquote: 1, hr: 1,
+        table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+        a: 1,
+    };
+    var PASTE_DROP_TAGS = { style: 1, script: 1, meta: 1, link: 1, img: 1, head: 1 };
+
+    function appendCleanedPasteNode(node, targetParent) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (node.textContent) {
+                targetParent.appendChild(document.createTextNode(node.textContent));
+            }
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return;
+        }
+        var tag = node.tagName.toLowerCase();
+        if (PASTE_DROP_TAGS[tag]) {
+            return;
+        }
+        if (PASTE_KEEP_TAGS[tag]) {
+            var clean = document.createElement(tag);
+            if (tag === "a") {
+                var href = node.getAttribute("href");
+                if (href) {
+                    clean.setAttribute("href", href);
+                }
+            }
+            Array.prototype.forEach.call(node.childNodes, function (child) {
+                appendCleanedPasteNode(child, clean);
+            });
+            targetParent.appendChild(clean);
+            return;
+        }
+        // Unknown wrapper (span, font, mso-* classed div, ...) — drop the
+        // element itself but keep walking into its children, same as the
+        // serializer's own "unwrap unrecognized inline tag" fallback.
+        Array.prototype.forEach.call(node.childNodes, function (child) {
+            appendCleanedPasteNode(child, targetParent);
+        });
+    }
+
+    function cleanPastedHtml(html) {
+        var container = document.createElement("div");
+        container.innerHTML = html;
+        var fragment = document.createDocumentFragment();
+        Array.prototype.forEach.call(container.childNodes, function (node) {
+            appendCleanedPasteNode(node, fragment);
+        });
+        return fragment;
+    }
+
+    function wirePasteSanitizer(surface) {
+        surface.addEventListener("paste", function (event) {
+            var clipboardData = event.clipboardData;
+            var html = clipboardData && clipboardData.getData("text/html");
+            if (!html) {
+                return; // no HTML on the clipboard — default plain-text paste is fine
+            }
+            event.preventDefault();
+            var fragment = cleanPastedHtml(html);
+            if (!fragment.childNodes.length) {
+                return;
+            }
+            insertFragmentAtSelection(surface, fragment);
+        });
+    }
+
     function uploadImage(file, altText, caption, align, size, onDone) {
         var formData = new FormData();
         formData.append("file", file);
@@ -743,6 +862,74 @@
         if (cancelButton) {
             cancelButton.addEventListener("click", closePanel);
         }
+    }
+
+    function buildAttachmentLink(attachmentId, filename) {
+        var anchor = document.createElement("a");
+        anchor.setAttribute("class", "attachment-link");
+        anchor.setAttribute("href", "/attachments/" + attachmentId + "/download/");
+        anchor.setAttribute("data-attachment-id", attachmentId);
+        anchor.setAttribute("download", filename || "");
+        anchor.textContent = ATTACHMENT_ICON_PREFIX + (filename || "Файл");
+        return anchor;
+    }
+
+    function wireAttachmentUpload(form, surface) {
+        var uploadButton = form.querySelector("[data-attachment-upload]");
+        var fileInput = form.querySelector("[data-attachment-input]");
+        if (!uploadButton || !fileInput) {
+            return;
+        }
+        var savedRange = null;
+
+        uploadButton.addEventListener("click", function () {
+            var selection = window.getSelection();
+            if (selection && selection.rangeCount > 0 && surface.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+                savedRange = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedRange = null;
+            }
+            fileInput.click();
+        });
+
+        fileInput.addEventListener("change", function () {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                return;
+            }
+            var formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/attachments/upload/", {
+                method: "POST",
+                headers: { "X-CSRFToken": getCsrfToken() },
+                body: formData,
+            })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (result.ok) {
+                        var anchor = buildAttachmentLink(result.data.id, result.data.filename);
+                        if (savedRange) {
+                            var selection = window.getSelection();
+                            selection.removeAllRanges();
+                            selection.addRange(savedRange);
+                        }
+                        insertNodeAtSelection(surface, anchor);
+                    } else {
+                        window.alert(result.data.error || "Не удалось загрузить файл.");
+                    }
+                })
+                .catch(function () {
+                    window.alert("Не удалось загрузить файл.");
+                })
+                .then(function () {
+                    fileInput.value = "";
+                });
+        });
     }
 
     var SIZE_ORDER = ["small", "medium", "large", "full"];
@@ -1190,7 +1377,9 @@
 
         wireToolbar(surface, articlesRef);
         wireImageUpload(form, surface);
+        wireAttachmentUpload(form, surface);
         wireImageInteractions(surface);
+        wirePasteSanitizer(surface);
         hints = wireWikiLinkHints(surface, articlesRef);
         wireFormSubmit(form, surface);
     });
