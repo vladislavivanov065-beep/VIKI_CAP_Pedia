@@ -100,8 +100,12 @@ SANITIZE_TAGS = {
     "span",
 }
 SANITIZE_ATTRIBUTES = {
-    "a": {"href", "title", "target"},
-    "img": {"src", "alt", "title"},
+    # data-wiki-* attributes carry the original [[...]] link target so the
+    # WYSIWYG editor's DOM->Markdown serializer can reconstruct the exact
+    # source syntax without guessing a title back from a slug — they're
+    # inert text for anything else that reads this HTML.
+    "a": {"href", "title", "target", "data-wiki-article-id", "data-wiki-title", "data-wiki-uuid"},
+    "img": {"src", "alt", "title", "data-image-id"},
     **{f"h{level}": {"id"} for level in range(1, 7)},
 }
 SANITIZE_CLASSES = {
@@ -131,9 +135,11 @@ class WikiLinkByUuidInlineProcessor(InlineProcessor):
             article = Article.objects.get(pk=raw_uuid)
         except (Article.DoesNotExist, ValueError, ValidationError):
             anchor.set("class", "wiki-link-missing")
+            anchor.set("data-wiki-uuid", raw_uuid)
             return anchor, m.start(0), m.end(0)
 
         anchor.set("href", _article_href(article))
+        anchor.set("data-wiki-article-id", str(article.pk))
         if article.is_archived:
             anchor.set("class", "wiki-link-archived")
             anchor.set("title", "Статья архивирована")
@@ -156,9 +162,11 @@ class WikiLinkByTitleInlineProcessor(InlineProcessor):
         except Article.DoesNotExist:
             anchor.set("href", _missing_article_href(title))
             anchor.set("class", "wiki-link-missing")
+            anchor.set("data-wiki-title", title)
             return anchor, m.start(0), m.end(0)
 
         anchor.set("href", _article_href(article))
+        anchor.set("data-wiki-article-id", str(article.pk))
         if article.is_archived:
             anchor.set("class", "wiki-link-archived")
             anchor.set("title", "Статья архивирована")
@@ -191,6 +199,7 @@ class ImageEmbedInlineProcessor(InlineProcessor):
             figure.set("class", " ".join(layout_classes))
         img = etree.SubElement(figure, "img")
         img.set("src", f"/images/{image.pk}/")
+        img.set("data-image-id", str(image.pk))
         img.set("alt", image.alt_text or caption_override or image.caption)
 
         caption_text = caption_override or image.caption

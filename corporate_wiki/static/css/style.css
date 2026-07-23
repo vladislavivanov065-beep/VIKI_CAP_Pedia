@@ -671,27 +671,112 @@ a.external-link::after {
     font-family: ui-monospace, "SF Mono", Consolas, monospace;
 }
 
-.wikilink-hint-host {
+/* WYSIWYG article editor (contenteditable) — the editing surface reuses
+   .content-card.content-card--article so it looks like the real article
+   while being edited; no separate source/preview split. */
+.wysiwyg-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding: 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-page);
+}
+
+.wysiwyg-toolbar__btn {
+    padding: 0.3rem 0.55rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.wysiwyg-toolbar__btn:hover {
+    border-color: var(--border-color);
+    background: var(--background-content);
+}
+
+.wysiwyg-toolbar__btn.is-active {
+    border-color: var(--link-color);
+    background: var(--background-content);
+}
+
+.wysiwyg-toolbar__sep {
+    width: 1px;
+    margin: 0 0.15rem;
+    background: var(--border-color);
+}
+
+.wysiwyg-surface {
+    min-height: 420px;
+    outline: none;
+    cursor: text;
+}
+
+.wysiwyg-surface:focus {
+    box-shadow: 0 0 0 2px var(--link-color) inset;
+}
+
+.wysiwyg-surface figure {
     position: relative;
 }
 
-.wikilink-hint-mirror {
-    position: absolute;
-    top: 0;
-    left: 0;
-    visibility: hidden;
-    overflow: hidden;
-    pointer-events: none;
+.wysiwyg-surface figure.is-selected {
+    outline: 2px solid var(--link-color);
+    outline-offset: 2px;
 }
 
-.wikilink-hint-layer {
+.wysiwyg-image-toolbar {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: hidden;
-    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-content);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.wysiwyg-image-toolbar button {
+    padding: 0.2rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.wysiwyg-image-toolbar button:hover,
+.wysiwyg-image-toolbar button.is-active {
+    border-color: var(--link-color);
+}
+
+.wysiwyg-image-toolbar button[data-action="delete"] {
+    color: var(--link-missing, #ba0000);
+}
+
+.wysiwyg-resize-handle {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: var(--link-color);
+    cursor: nwse-resize;
+    box-shadow: 0 0 0 1px var(--border-color);
+    z-index: 5;
+}
+
+.wikilink-hint-host {
+    position: relative;
+    display: inline-block;
 }
 
 .wikilink-hint {
@@ -709,21 +794,12 @@ a.external-link::after {
     cursor: pointer;
     pointer-events: auto;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    z-index: 4;
 }
 
 .wikilink-hint:hover {
     background: var(--link-color, #3366cc);
     color: #fff;
-}
-
-.article-preview {
-    min-height: 360px;
-    overflow-y: auto;
-}
-
-.preview-label {
-    font-weight: 600;
-    margin: 0 0 0.25rem;
 }
 
 .hidden-file-input {
