@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Создание статьи — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Создание статьи</h1>
+        <form method="post" class="article-form" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <ul class="form-errors">
+                    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+
+            <div class="form-row">
+                {{ form.title.label_tag }}
+                {{ form.title }}
+                {% for error in form.title.errors %}<ul class="form-errors"><li>{{ error }}</li></ul>{% endfor %}
+            </div>
+
+            <div class="form-row">
+                {{ form.edit_summary.label_tag }}
+                {{ form.edit_summary }}
+            </div>
+
+            <div class="editor-layout">
+                <div class="editor-layout__pane">
+                    {{ form.content_source.label_tag }}
+                    {{ form.content_source }}
+                </div>
+                <div class="editor-layout__pane">
+                    <label>Предварительный просмотр</label>
+                    <div class="content-card content-card--article article-preview" id="article-preview">
+                        <p class="text-secondary">Нажмите «Предпросмотр», чтобы увидеть, как будет выглядеть статья.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <button type="button" class="button" data-preview-target="article-preview">Предпросмотр</button>
+                <button type="submit" class="button--primary">Опубликовать</button>
+                <a class="button" href="{% url 'home' %}">Отмена</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/article-editor.js' %}"></script>
+{% endblock %}

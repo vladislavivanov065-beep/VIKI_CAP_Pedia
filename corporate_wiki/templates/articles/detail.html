@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    {% if article.is_archived %}
+        <div class="messages">
+            <p style="padding: 0.6rem 0.9rem; border-radius: 4px; background: #fde7e9; border: 1px solid #ba0000;">
+                Эта статья архивирована и не отображается в поиске и основном списке.
+            </p>
+        </div>
+    {% endif %}
+
+    <div class="content-card content-card--article">
+        <div class="article-header">
+            <h1>{{ article.title }}</h1>
+            <div class="article-actions">
+                <a class="button" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
+                <a class="button" href="{% url 'articles:edit' slug=article.slug %}">Редактировать</a>
+            </div>
+        </div>
+        <p class="text-secondary">
+            Последнее изменение: {{ article.updated_at|date:"d.m.Y H:i" }}
+            {% if revision %}автор — {{ revision.edited_by.display_name }}{% endif %}
+        </p>
+
+        {% if toc_html %}
+            <details class="toc" open>
+                <summary>Содержание</summary>
+                {{ toc_html|safe }}
+            </details>
+        {% endif %}
+
+        <div class="article-body">
+            {{ revision.content_html|safe }}
+        </div>
+    </div>
+{% endblock %}

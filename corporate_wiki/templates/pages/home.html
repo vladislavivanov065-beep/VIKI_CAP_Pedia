@@ -11,6 +11,22 @@
             и популярные статьи, а также ваши последние правки — начиная со
             следующих этапов разработки.
         </p>
-        <p><a class="button button--primary" href="/articles/create/">Создать статью</a></p>
+        <p><a class="button button--primary" href="{% url 'articles:create' %}">Создать статью</a></p>
+    </div>
+
+    <div class="content-card" style="margin-top: 1rem;">
+        <h2>Недавно изменённые статьи</h2>
+        {% if recent_articles %}
+            <ul class="sidebar__list">
+                {% for article in recent_articles %}
+                    <li>
+                        <a href="{% url 'articles:detail' slug=article.slug %}">{{ article.title }}</a>
+                        — {{ article.updated_at|date:"d.m.Y H:i" }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Пока нет ни одной статьи.</p>
+        {% endif %}
     </div>
 {% endblock %}
