@@ -8,12 +8,12 @@ from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 
 from apps.accounts import services
-from apps.accounts.forms import EmailAuthenticationForm, ForcedPasswordChangeForm
+from apps.accounts.forms import ForcedPasswordChangeForm, ProfileForm, UsernameAuthenticationForm
 
 
-class EmailLoginView(LoginView):
+class AccountLoginView(LoginView):
     template_name = "registration/login.html"
-    authentication_form = EmailAuthenticationForm
+    authentication_form = UsernameAuthenticationForm
     redirect_authenticated_user = True
 
     def form_valid(self, form):
@@ -53,7 +53,15 @@ class ForcedPasswordChangeView(PasswordChangeView):
 
 
 def security_settings(request):
-    return render(request, "accounts/security_settings.html")
+    if request.method == "POST":
+        form = ProfileForm(request.POST, user=request.user)
+        if form.is_valid():
+            form.save(user_agent=request.META.get("HTTP_USER_AGENT", ""))
+            messages.success(request, "Данные профиля обновлены.")
+            return redirect("accounts:security_settings")
+    else:
+        form = ProfileForm(user=request.user)
+    return render(request, "accounts/security_settings.html", {"profile_form": form})
 
 
 @require_POST

@@ -32,7 +32,7 @@ def test_audit_log_cannot_be_deleted():
 
 def test_audit_log_survives_actor_deactivation_reference():
     user = UserFactory()
-    entry = record_event(actor=user, action="user.created", metadata={"email": user.email})
+    entry = record_event(actor=user, action="user.created", metadata={"username": user.username})
     assert AuditLog.objects.get(pk=entry.pk).actor == user
 
 

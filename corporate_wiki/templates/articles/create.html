@@ -6,7 +6,8 @@
 {% block content %}
     <div class="content-card">
         <h1>Создание статьи</h1>
-        <form method="post" class="article-form" novalidate>
+        <form method="post" class="article-form" novalidate
+              data-link-suggestions-url="{% url 'articles:link_suggestions' %}">
             {% csrf_token %}
             {% if form.non_field_errors %}
                 <ul class="form-errors" role="alert">

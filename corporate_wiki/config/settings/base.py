@@ -134,7 +134,7 @@ MAX_IMAGE_HEIGHT = env.int("MAX_IMAGE_HEIGHT", default=8000)
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never
 # logged, never stored anywhere except as a hashed password.
-ADMIN_EMAIL = env("ADMIN_EMAIL", default="")
+ADMIN_USERNAME = env("ADMIN_USERNAME", default="")
 ADMIN_TEMP_PASSWORD = env("ADMIN_TEMP_PASSWORD", default="")
 
 LOGIN_URL = "/login/"

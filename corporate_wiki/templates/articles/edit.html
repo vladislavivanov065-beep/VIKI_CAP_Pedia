@@ -28,7 +28,9 @@
             </div>
         {% endif %}
 
-        <form method="post" class="article-form" novalidate>
+        <form method="post" class="article-form" novalidate
+              data-link-suggestions-url="{% url 'articles:link_suggestions' %}"
+              data-exclude-slug="{{ article.slug }}">
             {% csrf_token %}
             {{ form.base_revision_id }}
             {{ form.article_version }}

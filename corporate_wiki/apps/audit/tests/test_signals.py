@@ -8,16 +8,16 @@ pytestmark = pytest.mark.django_db
 
 
 def test_successful_login_is_recorded(client):
-    UserFactory(email="worker@example.com", must_change_password=False)
+    UserFactory(username="worker", must_change_password=False)
 
     client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "worker", "password": DEFAULT_TEST_PASSWORD},
         HTTP_USER_AGENT="pytest-browser/1.0",
     )
 
     entry = AuditLog.objects.filter(action="user.login").latest("created_at")
-    assert entry.actor.email == "worker@example.com"
+    assert entry.actor.username == "worker"
     assert entry.user_agent == "pytest-browser/1.0"
 
 
@@ -26,12 +26,12 @@ def test_failed_login_is_recorded_without_identifying_a_user():
 
     Client().post(
         reverse("accounts:login"),
-        {"username": "nobody@example.com", "password": "wrong"},
+        {"username": "nobody", "password": "wrong"},
     )
 
     entry = AuditLog.objects.filter(action="user.login_failed").latest("created_at")
     assert entry.actor is None
-    assert entry.metadata.get("email") == "nobody@example.com"
+    assert entry.metadata.get("username") == "nobody"
 
 
 def test_logout_is_recorded(client):

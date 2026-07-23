@@ -33,7 +33,7 @@ def _log_event(
     security_logger.info(
         "%s actor=%s article=%s metadata=%s",
         action,
-        actor.email if actor else None,
+        actor.username if actor else None,
         article.slug,
         metadata,
     )

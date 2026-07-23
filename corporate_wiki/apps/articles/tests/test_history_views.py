@@ -34,20 +34,20 @@ def test_history_page_lists_all_revisions_newest_first(client):
     assert content.index("№3") < content.index("№2") < content.index("№1")
 
 
-def test_history_email_hidden_from_regular_users_but_shown_to_staff(client):
-    author = UserFactory(must_change_password=False, email="author@example.com")
+def test_history_username_hidden_from_regular_users_but_shown_to_staff(client):
+    author = UserFactory(must_change_password=False, username="author")
     article = services.create_article(title="Статья", content_source="x", created_by=author)
 
     regular = UserFactory(must_change_password=False)
     client.force_login(regular)
     response = client.get(reverse("articles:history", kwargs={"slug": article.slug}))
-    assert "author@example.com" not in response.content.decode()
+    assert "author" not in response.content.decode()
 
     client.logout()
     staff = UserFactory(must_change_password=False, is_staff=True)
     client.force_login(staff)
     response = client.get(reverse("articles:history", kwargs={"slug": article.slug}))
-    assert "author@example.com" in response.content.decode()
+    assert "author" in response.content.decode()
 
 
 def test_history_pagination(client):

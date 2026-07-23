@@ -6,9 +6,9 @@ from apps.accounts.models import User
 pytestmark = pytest.mark.django_db
 
 
-def test_display_name_falls_back_to_email_when_names_blank():
-    user = UserFactory(first_name="", last_name="", email="Nameless@Example.com")
-    assert user.display_name == "nameless@example.com"
+def test_display_name_falls_back_to_username_when_names_blank():
+    user = UserFactory(first_name="", last_name="", username="Nameless")
+    assert user.display_name == "nameless"
 
 
 def test_display_name_uses_full_name_when_available():
@@ -16,19 +16,19 @@ def test_display_name_uses_full_name_when_available():
     assert user.display_name == "Иван Иванов"
 
 
-def test_get_short_name_falls_back_to_email():
+def test_get_short_name_falls_back_to_username():
     user = UserFactory(first_name="", last_name="")
-    assert user.get_short_name() == user.email
+    assert user.get_short_name() == user.username
 
 
-def test_email_is_normalized_on_save():
-    user = UserFactory(email="  Mixed.Case@Example.COM  ")
+def test_username_is_normalized_on_save():
+    user = UserFactory(username="  Mixed.Case  ")
     user.refresh_from_db()
-    assert user.email == "mixed.case@example.com"
+    assert user.username == "mixed.case"
 
 
 def test_new_user_defaults_to_must_change_password_true():
-    user = User.objects.create_user(email="fresh@example.com", password="StrongPassw0rd!23")
+    user = User.objects.create_user(username="fresh", password="StrongPassw0rd!23")
     assert user.must_change_password is True
 
 

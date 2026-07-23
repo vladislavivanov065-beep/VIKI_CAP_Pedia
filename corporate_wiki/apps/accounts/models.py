@@ -4,20 +4,26 @@ import uuid
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
+from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.db import models
 
 from apps.accounts.managers import UserManager
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """Custom user authenticated by email, no username field.
+    """Custom user authenticated by username (login), not email.
 
     Deliberately does NOT have job_title, department or avatar fields —
-    those are explicitly out of scope for this project.
+    those are explicitly out of scope for this project. Usernames are
+    restricted to ASCII letters/digits/@/./+/-/_ (``ASCIIUsernameValidator``)
+    so that SQLite's ASCII-only case folding stays correct for uniqueness
+    and login lookups.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True)
+    username = models.CharField(
+        "логин", max_length=150, unique=True, validators=[ASCIIUsernameValidator()]
+    )
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
 
@@ -33,28 +39,29 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD = "username"
     REQUIRED_FIELDS = []
 
     class Meta:
         verbose_name = "пользователь"
         verbose_name_plural = "пользователи"
-        ordering = ["email"]
+        ordering = ["username"]
 
     def __str__(self) -> str:
-        return self.email
+        return self.username
 
     def save(self, *args, **kwargs):
-        if self.email:
-            self.email = self.email.strip().lower()
+        if self.username:
+            self.username = self.username.strip().lower()
         super().save(*args, **kwargs)
 
     def get_full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
 
     def get_short_name(self) -> str:
-        return self.first_name or self.email
+        return self.first_name or self.username
 
     @property
     def display_name(self) -> str:
-        return self.get_full_name() or self.email
+        """Full name when known, otherwise fall back to the login."""
+        return self.get_full_name() or self.username

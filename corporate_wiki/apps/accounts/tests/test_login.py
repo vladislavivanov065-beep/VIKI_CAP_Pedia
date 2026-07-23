@@ -8,11 +8,11 @@ pytestmark = pytest.mark.django_db
 
 
 def test_login_with_correct_credentials_succeeds(client):
-    UserFactory(email="worker@example.com", must_change_password=False)
+    UserFactory(username="worker", must_change_password=False)
 
     response = client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "worker", "password": DEFAULT_TEST_PASSWORD},
     )
 
     assert response.status_code == 302
@@ -30,78 +30,78 @@ def test_login_page_shows_configured_site_name_not_request_host(client, settings
     assert "testserver" not in content
 
 
-def test_login_is_case_insensitive_on_email(client):
-    UserFactory(email="worker@example.com", must_change_password=False)
+def test_login_is_case_insensitive_on_username(client):
+    UserFactory(username="worker", must_change_password=False)
 
     response = client.post(
         reverse("accounts:login"),
-        {"username": "Worker@Example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "Worker", "password": DEFAULT_TEST_PASSWORD},
     )
 
     assert response.status_code == 302
 
 
 def test_login_wrong_password_shows_generic_error(client):
-    UserFactory(email="worker@example.com")
+    UserFactory(username="worker")
 
     response = client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": "wrong-password"},
+        {"username": "worker", "password": "wrong-password"},
     )
 
     assert response.status_code == 200
-    assert "Неверный email или пароль." in response.content.decode()
+    assert "Неверный логин или пароль." in response.content.decode()
 
 
-def test_login_nonexistent_email_shows_same_generic_error(client):
+def test_login_nonexistent_username_shows_same_generic_error(client):
     response = client.post(
         reverse("accounts:login"),
-        {"username": "nobody@example.com", "password": "whatever-1234"},
+        {"username": "nobody", "password": "whatever-1234"},
     )
 
     assert response.status_code == 200
-    assert "Неверный email или пароль." in response.content.decode()
+    assert "Неверный логин или пароль." in response.content.decode()
 
 
 def test_login_deactivated_user_is_blocked(client):
-    UserFactory(email="inactive@example.com", is_active=False)
+    UserFactory(username="inactive", is_active=False)
 
     response = client.post(
         reverse("accounts:login"),
-        {"username": "inactive@example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "inactive", "password": DEFAULT_TEST_PASSWORD},
     )
 
     assert response.status_code == 200
     assert client.session.get("_auth_user_id") is None
 
 
-def test_repeated_failed_logins_lock_the_email_out(client):
-    UserFactory(email="worker@example.com")
+def test_repeated_failed_logins_lock_the_username_out(client):
+    UserFactory(username="worker")
 
     for _ in range(MAX_ATTEMPTS):
         client.post(
             reverse("accounts:login"),
-            {"username": "worker@example.com", "password": "wrong-password"},
+            {"username": "worker", "password": "wrong-password"},
         )
 
     response = client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "worker", "password": DEFAULT_TEST_PASSWORD},
     )
 
     assert "Слишком много неудачных попыток" in response.content.decode()
 
 
 def test_successful_login_resets_failed_attempt_counter(client):
-    UserFactory(email="worker@example.com", must_change_password=False)
+    UserFactory(username="worker", must_change_password=False)
 
     client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": "wrong-password"},
+        {"username": "worker", "password": "wrong-password"},
     )
     response = client.post(
         reverse("accounts:login"),
-        {"username": "worker@example.com", "password": DEFAULT_TEST_PASSWORD},
+        {"username": "worker", "password": DEFAULT_TEST_PASSWORD},
     )
 
     assert response.status_code == 302
