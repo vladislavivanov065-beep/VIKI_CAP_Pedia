@@ -1,0 +1,67 @@
+[project]
+name = "corporate-wiki"
+version = "0.1.0"
+description = "Закрытая корпоративная база знаний"
+requires-python = ">=3.12"
+dependencies = [
+    "django==5.2.*",
+    "django-environ>=0.11",
+    "whitenoise>=6.7",
+    "pillow>=10.4",
+    "gunicorn>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+    "factory_boy>=3.3",
+    "coverage>=7.6",
+    "ruff>=0.6",
+    "black>=24.8",
+    "mypy>=1.11",
+    "django-stubs>=5.0",
+    "pre-commit>=3.8",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "DJ"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+extend-exclude = "migrations"
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+ignore_missing_imports = true
+exclude = "migrations/"
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = ["*/migrations/*", "*/tests/*", "manage.py"]
+
+[tool.coverage.report]
+fail_under = 85
+exclude_lines = ["pragma: no cover"]

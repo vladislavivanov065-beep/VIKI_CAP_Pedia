@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    image: corporate-wiki:latest
+    env_file:
+      - .env
+    volumes:
+      - wiki_data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  wiki_data:
