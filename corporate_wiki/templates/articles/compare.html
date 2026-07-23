@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Сравнение версий: {{ article.title }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Сравнение версий: {{ article.title }}</h1>
+
+        <table class="compare-meta">
+            <tr>
+                <th>Версия</th>
+                <td>№{{ from_revision.revision_number }}</td>
+                <td>№{{ to_revision.revision_number }}</td>
+            </tr>
+            <tr>
+                <th>Заголовок</th>
+                <td>{{ from_revision.title }}</td>
+                <td>{{ to_revision.title }}</td>
+            </tr>
+            <tr>
+                <th>Автор</th>
+                <td>{{ from_revision.edited_by.display_name }}</td>
+                <td>{{ to_revision.edited_by.display_name }}</td>
+            </tr>
+            <tr>
+                <th>Дата</th>
+                <td>{{ from_revision.created_at|date:"d.m.Y H:i" }}</td>
+                <td>{{ to_revision.created_at|date:"d.m.Y H:i" }}</td>
+            </tr>
+            <tr>
+                <th>Описание изменения</th>
+                <td>{{ from_revision.edit_summary }}</td>
+                <td>{{ to_revision.edit_summary }}</td>
+            </tr>
+        </table>
+
+        <div class="form-row">
+            <a class="button {% if view_mode == 'split' %}button--primary{% endif %}"
+               href="?from={{ from_revision.revision_number }}&to={{ to_revision.revision_number }}&view=split">Две колонки</a>
+            <a class="button {% if view_mode == 'unified' %}button--primary{% endif %}"
+               href="?from={{ from_revision.revision_number }}&to={{ to_revision.revision_number }}&view=unified">Единый текст</a>
+        </div>
+
+        {% if view_mode == 'split' %}
+            <table class="diff-table diff-table--split">
+                <thead>
+                    <tr>
+                        <th>Версия №{{ from_revision.revision_number }}</th>
+                        <th>Версия №{{ to_revision.revision_number }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in diff_lines %}
+                        <tr>
+                            {% if entry.type == "removed" %}
+                                <td class="diff-line diff-line--removed">{{ entry.old }}</td>
+                                <td class="diff-line diff-line--empty"></td>
+                            {% elif entry.type == "added" %}
+                                <td class="diff-line diff-line--empty"></td>
+                                <td class="diff-line diff-line--added">{{ entry.new }}</td>
+                            {% elif entry.type == "changed" %}
+                                <td class="diff-line diff-line--changed">
+                                    {% for span in entry.old_spans %}
+                                        {% if span.1 == "removed" %}<mark class="diff-word-removed">{{ span.0 }}</mark>{% else %}{{ span.0 }}{% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td class="diff-line diff-line--changed">
+                                    {% for span in entry.new_spans %}
+                                        {% if span.1 == "added" %}<mark class="diff-word-added">{{ span.0 }}</mark>{% else %}{{ span.0 }}{% endif %}
+                                    {% endfor %}
+                                </td>
+                            {% else %}
+                                <td class="diff-line">{{ entry.old }}</td>
+                                <td class="diff-line">{{ entry.new }}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <pre class="diff-unified">{% for entry in diff_lines %}{% if entry.type == "equal" %}  {{ entry.old }}
+{% elif entry.type == "removed" %}<span class="diff-line--removed">- {{ entry.old }}</span>
+{% elif entry.type == "added" %}<span class="diff-line--added">+ {{ entry.new }}</span>
+{% elif entry.type == "changed" %}<span class="diff-line--removed">- {% for span in entry.old_spans %}{% if span.1 == "removed" %}<mark class="diff-word-removed">{{ span.0 }}</mark>{% else %}{{ span.0 }}{% endif %}{% endfor %}</span>
+<span class="diff-line--added">+ {% for span in entry.new_spans %}{% if span.1 == "added" %}<mark class="diff-word-added">{{ span.0 }}</mark>{% else %}{{ span.0 }}{% endif %}{% endfor %}</span>
+{% endif %}{% endfor %}</pre>
+        {% endif %}
+    </div>
+{% endblock %}

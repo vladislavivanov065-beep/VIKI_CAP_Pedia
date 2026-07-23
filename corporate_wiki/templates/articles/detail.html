@@ -11,12 +11,18 @@
         </div>
     {% endif %}
 
+    <nav class="article-tabs" aria-label="Вкладки статьи">
+        <a class="article-tabs__tab article-tabs__tab--active" href="{% url 'articles:detail' slug=article.slug %}">Статья</a>
+        <a class="article-tabs__tab" href="{% url 'articles:history' slug=article.slug %}">История</a>
+    </nav>
+
     <div class="content-card content-card--article">
         <div class="article-header">
             <h1>{{ article.title }}</h1>
             <div class="article-actions">
-                <a class="button" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
+                <a class="button button--primary" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
                 <a class="button" href="{% url 'articles:edit' slug=article.slug %}">Редактировать</a>
+                <a class="button" href="{% url 'articles:detail' slug=article.slug %}?view=source">Посмотреть код</a>
             </div>
         </div>
         <p class="text-secondary">
@@ -24,15 +30,19 @@
             {% if revision %}автор — {{ revision.edited_by.display_name }}{% endif %}
         </p>
 
-        {% if toc_html %}
-            <details class="toc" open>
-                <summary>Содержание</summary>
-                {{ toc_html|safe }}
-            </details>
-        {% endif %}
+        {% if show_source %}
+            <pre class="article-source">{{ revision.content_source }}</pre>
+        {% else %}
+            {% if toc_html %}
+                <details class="toc" open>
+                    <summary>Содержание</summary>
+                    {{ toc_html|safe }}
+                </details>
+            {% endif %}
 
-        <div class="article-body">
-            {{ revision.content_html|safe }}
-        </div>
+            <div class="article-body">
+                {{ revision.content_html|safe }}
+            </div>
+        {% endif %}
     </div>
 {% endblock %}

@@ -9,4 +9,16 @@ urlpatterns = [
     path("preview/", views.article_preview, name="preview"),
     path("<str:slug>/", views.article_detail, name="detail"),
     path("<str:slug>/edit/", views.article_edit, name="edit"),
+    path("<str:slug>/history/", views.article_history, name="history"),
+    path("<str:slug>/compare/", views.article_compare, name="compare"),
+    path(
+        "<str:slug>/revisions/<int:revision_number>/",
+        views.article_revision_detail,
+        name="revision_detail",
+    ),
+    path(
+        "<str:slug>/restore/<int:revision_number>/",
+        views.article_restore,
+        name="restore",
+    ),
 ]

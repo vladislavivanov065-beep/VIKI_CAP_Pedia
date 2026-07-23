@@ -586,3 +586,106 @@ a.external-link::after {
         flex-direction: column;
     }
 }
+
+/* ---------------------------------------------------------------- */
+/* History, revisions, diff                                          */
+/* ---------------------------------------------------------------- */
+
+.article-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: -1px;
+}
+
+.article-tabs__tab {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-light);
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: var(--background-page);
+    color: var(--text-primary);
+}
+
+.article-tabs__tab--active {
+    background: var(--background-content);
+    font-weight: 700;
+    border-color: var(--border-color);
+}
+
+.article-source {
+    background: var(--background-page);
+    border: 1px solid var(--border-light);
+    padding: 1rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+
+.history-table,
+.compare-meta,
+.diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.history-table th,
+.history-table td,
+.compare-meta th,
+.compare-meta td,
+.diff-table th,
+.diff-table td {
+    border: 1px solid var(--border-light);
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.compare-meta th {
+    background: var(--background-page);
+    width: 160px;
+}
+
+.pagination {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.diff-line--removed,
+td.diff-line--removed {
+    background: #fde7e9;
+}
+
+.diff-line--added,
+td.diff-line--added {
+    background: #e6f6e6;
+}
+
+.diff-line--empty {
+    background: var(--background-page);
+}
+
+.diff-line--changed {
+    background: #fff8e1;
+}
+
+mark.diff-word-removed {
+    background: #f7c9cd;
+    text-decoration: line-through;
+}
+
+mark.diff-word-added {
+    background: #b7e4b7;
+}
+
+.diff-unified {
+    background: var(--background-page);
+    border: 1px solid var(--border-light);
+    padding: 1rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    line-height: 1.6;
+}

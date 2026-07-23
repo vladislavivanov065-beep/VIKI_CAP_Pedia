@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.articles import selectors, services
+from apps.articles.diffing import build_line_diff
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
 from apps.articles.forms import ArticleCreateForm, ArticleEditForm, ArticlePreviewForm
 from apps.articles.markdown_ext import extract_toc_html, render_article_content
-from apps.articles.models import Article, ArticleRedirect
+from apps.articles.models import Article, ArticleRedirect, ArticleRevision
 
 
 def article_create(request):
@@ -70,6 +72,7 @@ def article_detail(request, slug: str):
             "article": article,
             "revision": revision,
             "toc_html": toc_html,
+            "show_source": request.GET.get("view") == "source",
         },
     )
 
@@ -139,3 +142,105 @@ def article_preview(request):
 
     content_html, toc_html = render_article_content(form.cleaned_data["content_source"])
     return JsonResponse({"content_html": content_html, "toc_html": toc_html})
+
+
+def article_history(request, slug: str):
+    article = get_object_or_404(Article, slug=slug)
+    revisions = list(selectors.get_article_history(article))  # newest first
+
+    entries = []
+    for index, revision in enumerate(revisions):
+        size = len(revision.content_source)
+        older_revision = revisions[index + 1] if index + 1 < len(revisions) else None
+        size_diff = size - len(older_revision.content_source) if older_revision else size
+        entries.append({"revision": revision, "size": size, "size_diff": size_diff})
+
+    paginator = Paginator(entries, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "articles/history.html", {"article": article, "page_obj": page_obj})
+
+
+def article_revision_detail(request, slug: str, revision_number: int):
+    article = get_object_or_404(Article, slug=slug)
+    revision = get_object_or_404(ArticleRevision, article=article, revision_number=revision_number)
+    is_current = article.current_revision_id == revision.id
+    toc_html = extract_toc_html(revision.content_html)
+
+    numbers = list(
+        article.revisions.order_by("revision_number").values_list("revision_number", flat=True)
+    )
+    position = numbers.index(revision_number)
+    previous_number = numbers[position - 1] if position > 0 else None
+    next_number = numbers[position + 1] if position + 1 < len(numbers) else None
+
+    return render(
+        request,
+        "articles/revision_detail.html",
+        {
+            "article": article,
+            "revision": revision,
+            "is_current": is_current,
+            "toc_html": toc_html,
+            "previous_number": previous_number,
+            "next_number": next_number,
+        },
+    )
+
+
+def article_compare(request, slug: str):
+    article = get_object_or_404(Article, slug=slug)
+
+    try:
+        from_number = int(request.GET.get("from", ""))
+        to_number = int(request.GET.get("to", ""))
+    except (TypeError, ValueError):
+        raise Http404("Укажите обе версии для сравнения (from и to).") from None
+
+    from_revision = get_object_or_404(ArticleRevision, article=article, revision_number=from_number)
+    to_revision = get_object_or_404(ArticleRevision, article=article, revision_number=to_number)
+
+    if from_revision.revision_number > to_revision.revision_number:
+        from_revision, to_revision = to_revision, from_revision
+
+    diff_lines = build_line_diff(from_revision.content_source, to_revision.content_source)
+    view_mode = "unified" if request.GET.get("view") == "unified" else "split"
+
+    return render(
+        request,
+        "articles/compare.html",
+        {
+            "article": article,
+            "from_revision": from_revision,
+            "to_revision": to_revision,
+            "diff_lines": diff_lines,
+            "view_mode": view_mode,
+        },
+    )
+
+
+@require_POST
+def article_restore(request, slug: str, revision_number: int):
+    article = get_object_or_404(Article, slug=slug)
+
+    try:
+        article_version = int(request.POST.get("article_version", ""))
+    except (TypeError, ValueError):
+        raise Http404("Некорректная версия статьи.") from None
+
+    try:
+        services.restore_revision(
+            article_id=article.pk,
+            revision_number=revision_number,
+            base_revision_id=request.POST.get("base_revision_id") or None,
+            article_version=article_version,
+            actor=request.user,
+        )
+    except ArticleEditConflict:
+        messages.error(
+            request, "Статья изменилась с момента открытия этой страницы. Попробуйте ещё раз."
+        )
+        return redirect("articles:revision_detail", slug=slug, revision_number=revision_number)
+
+    messages.success(request, f"Версия №{revision_number} восстановлена.")
+    return redirect("articles:detail", slug=article.slug)
