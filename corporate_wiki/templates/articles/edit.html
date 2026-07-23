@@ -16,11 +16,11 @@
             </div>
             <div class="editor-layout">
                 <div class="editor-layout__pane">
-                    <label>Текущая сохранённая версия</label>
+                    <h3>Текущая сохранённая версия</h3>
                     <div class="content-card content-card--article">{{ current_revision.content_html|safe }}</div>
                 </div>
                 <div class="editor-layout__pane">
-                    <label>Ваш вариант (ещё не сохранён)</label>
+                    <h3>Ваш вариант (ещё не сохранён)</h3>
                     <div class="content-card content-card--article">
                         <pre style="white-space: pre-wrap;">{{ form.content_source.value }}</pre>
                     </div>
@@ -33,7 +33,7 @@
             {{ form.base_revision_id }}
             {{ form.article_version }}
             {% if form.non_field_errors %}
-                <ul class="form-errors">
+                <ul class="form-errors" role="alert">
                     {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
                 </ul>
             {% endif %}
@@ -49,14 +49,20 @@
                     {{ form.content_source }}
                 </div>
                 <div class="editor-layout__pane">
-                    <label>Предварительный просмотр</label>
-                    <div class="content-card content-card--article article-preview" id="article-preview">
+                    <p id="article-preview-label" class="preview-label">Предварительный просмотр</p>
+                    <div
+                        class="content-card content-card--article article-preview"
+                        id="article-preview"
+                        role="region"
+                        aria-labelledby="article-preview-label"
+                        aria-live="polite"
+                    >
                         <p class="text-secondary">Нажмите «Предпросмотр», чтобы увидеть изменения.</p>
                     </div>
                 </div>
             </div>
 
-            <input type="file" data-image-input accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            {% include "includes/image_insert_panel.html" %}
 
             <div class="form-row">
                 <button type="button" class="button" data-image-upload>Добавить изображение</button>

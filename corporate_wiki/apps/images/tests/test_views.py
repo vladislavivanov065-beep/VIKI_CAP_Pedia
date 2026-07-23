@@ -86,6 +86,24 @@ def test_upload_endpoint_creates_image_and_returns_markdown_snippet(client):
     assert data["id"]
 
 
+def test_upload_endpoint_stores_alt_text_and_caption(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+
+    upload = SimpleUploadedFile("test.png", make_image_bytes(), content_type="image/png")
+    response = client.post(
+        reverse("images:upload"),
+        {"file": upload, "alt_text": "Схема отпусков", "caption": "Рис. 1"},
+    )
+
+    assert response.status_code == 200
+    from apps.images.models import ArticleImage
+
+    image = ArticleImage.objects.get(pk=response.json()["id"])
+    assert image.alt_text == "Схема отпусков"
+    assert image.caption == "Рис. 1"
+
+
 def test_upload_endpoint_rejects_invalid_file(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)

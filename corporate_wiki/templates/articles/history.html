@@ -34,8 +34,22 @@
                 <tbody>
                     {% for entry in page_obj %}
                         <tr>
-                            <td><input type="radio" name="from" value="{{ entry.revision.revision_number }}"></td>
-                            <td><input type="radio" name="to" value="{{ entry.revision.revision_number }}"></td>
+                            <td>
+                                <input
+                                    type="radio"
+                                    name="from"
+                                    value="{{ entry.revision.revision_number }}"
+                                    aria-label="Сравнить от версии №{{ entry.revision.revision_number }}"
+                                >
+                            </td>
+                            <td>
+                                <input
+                                    type="radio"
+                                    name="to"
+                                    value="{{ entry.revision.revision_number }}"
+                                    aria-label="Сравнить до версии №{{ entry.revision.revision_number }}"
+                                >
+                            </td>
                             <td>
                                 <a href="{% url 'articles:revision_detail' slug=article.slug revision_number=entry.revision.revision_number %}">
                                     №{{ entry.revision.revision_number }}
