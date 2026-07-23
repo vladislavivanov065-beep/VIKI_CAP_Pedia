@@ -11,9 +11,7 @@
         <div class="sidebar__section">
             <h2 class="sidebar__heading">Личное</h2>
             <ul class="sidebar__list">
-                <li><a href="/users/{{ user.id }}/">Мой профиль</a></li>
-                <li><a href="/settings/profile/">Настройки профиля</a></li>
-                <li><a href="/settings/security/">Безопасность</a></li>
+                <li><a href="{% url 'accounts:security_settings' %}">Безопасность</a></li>
             </ul>
         </div>
     {% endif %}

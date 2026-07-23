@@ -127,6 +127,22 @@ def invalidate_user_sessions(user: User) -> int:
     return deleted
 
 
+def invalidate_other_sessions(*, user: User, current_session_key: str | None) -> int:
+    """Same as ``invalidate_user_sessions`` but keeps the caller's own
+    current session alive (section 9.7: "завершить другие активные
+    сессии" — the user doing this is still using one of them).
+    """
+    deleted = 0
+    for session in Session.objects.filter(expire_date__gte=timezone.now()):
+        if session.session_key == current_session_key:
+            continue
+        data = session.get_decoded()
+        if data.get(SESSION_KEY) == str(user.pk):
+            session.delete()
+            deleted += 1
+    return deleted
+
+
 def set_force_password_change(
     *, user: User, actor: User, value: bool = True, user_agent: str = ""
 ) -> User:

@@ -3,8 +3,11 @@ from __future__ import annotations
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import LoginView, PasswordChangeView
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.views.decorators.http import require_POST
 
+from apps.accounts import services
 from apps.accounts.forms import EmailAuthenticationForm, ForcedPasswordChangeForm
 
 
@@ -47,3 +50,16 @@ class ForcedPasswordChangeView(PasswordChangeView):
         response = super().form_valid(form)
         messages.success(self.request, "Пароль успешно изменён.")
         return response
+
+
+def security_settings(request):
+    return render(request, "accounts/security_settings.html")
+
+
+@require_POST
+def terminate_other_sessions(request):
+    count = services.invalidate_other_sessions(
+        user=request.user, current_session_key=request.session.session_key
+    )
+    messages.success(request, f"Завершено других сессий: {count}.")
+    return redirect("accounts:security_settings")
