@@ -1,0 +1,28 @@
+<nav class="sidebar" aria-label="Основная навигация">
+    <div class="sidebar__section">
+        <h2 class="sidebar__heading">Навигация</h2>
+        <ul class="sidebar__list">
+            <li><a href="{% url 'home' %}">Главная страница</a></li>
+            <li><a href="/search/">Поиск по статьям</a></li>
+            <li><a href="/articles/create/">Создать статью</a></li>
+        </ul>
+    </div>
+    {% if user.is_authenticated %}
+        <div class="sidebar__section">
+            <h2 class="sidebar__heading">Личное</h2>
+            <ul class="sidebar__list">
+                <li><a href="/users/{{ user.id }}/">Мой профиль</a></li>
+                <li><a href="/settings/profile/">Настройки профиля</a></li>
+                <li><a href="/settings/security/">Безопасность</a></li>
+            </ul>
+        </div>
+    {% endif %}
+    {% if user.is_staff %}
+        <div class="sidebar__section">
+            <h2 class="sidebar__heading">Администрирование</h2>
+            <ul class="sidebar__list">
+                <li><a href="{% url 'admin:index' %}">Django Admin</a></li>
+            </ul>
+        </div>
+    {% endif %}
+</nav>

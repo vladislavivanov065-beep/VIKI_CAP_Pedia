@@ -21,3 +21,13 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
+
+# The WhiteNoise manifest storage used elsewhere requires `collectstatic`
+# to have run first. Tests resolve static files straight from
+# STATICFILES_DIRS instead, so the suite never depends on that step.
+STORAGES = {
+    **STORAGES,  # noqa: F405
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}

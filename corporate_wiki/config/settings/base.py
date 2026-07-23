@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "apps.accounts",
 ]
 
 MIDDLEWARE = [
@@ -36,8 +37,15 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "apps.accounts.middleware.ForcePasswordChangeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -53,6 +61,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "config.context_processors.site_settings",
             ],
         },
     },
@@ -118,6 +127,11 @@ SITE_URL = env("SITE_URL", default="http://localhost:8000")
 MAX_IMAGE_SIZE_MB = env.int("MAX_IMAGE_SIZE_MB", default=10)
 MAX_IMAGE_WIDTH = env.int("MAX_IMAGE_WIDTH", default=8000)
 MAX_IMAGE_HEIGHT = env.int("MAX_IMAGE_HEIGHT", default=8000)
+
+# Bootstrap credentials for `manage.py create_initial_admin` only. Never
+# logged, never stored anywhere except as a hashed password.
+ADMIN_EMAIL = env("ADMIN_EMAIL", default="")
+ADMIN_TEMP_PASSWORD = env("ADMIN_TEMP_PASSWORD", default="")
 
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"

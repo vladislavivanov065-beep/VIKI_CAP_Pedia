@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>{{ site_name }}</h1>
+        <p>Здравствуйте, {{ user.display_name }}!</p>
+        <p>
+            Это корпоративная база знаний. Здесь появятся недавно изменённые
+            и популярные статьи, а также ваши последние правки — начиная со
+            следующих этапов разработки.
+        </p>
+        <p><a class="button button--primary" href="/articles/create/">Создать статью</a></p>
+    </div>
+{% endblock %}
