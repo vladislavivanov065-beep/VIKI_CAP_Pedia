@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from apps.articles import services
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision
 
 
@@ -30,11 +31,34 @@ class ArticleAdmin(admin.ModelAdmin):
         "archived_by",
     ]
     inlines = [ArticleRevisionInline]
+    actions = ["archive_selected", "restore_selected"]
 
     def has_delete_permission(self, request, obj=None):
         # Physical deletion of an article is never allowed through the UI
         # (section 4.1) — archiving is the only supported removal path.
         return False
+
+    @admin.action(description="Архивировать выбранные статьи")
+    def archive_selected(self, request, queryset):
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        count = 0
+        for article in queryset.filter(is_archived=False):
+            services.archive_article(
+                article_id=article.pk, actor=request.user, user_agent=user_agent
+            )
+            count += 1
+        self.message_user(request, f"Архивировано статей: {count}.")
+
+    @admin.action(description="Восстановить выбранные статьи из архива")
+    def restore_selected(self, request, queryset):
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        count = 0
+        for article in queryset.filter(is_archived=True):
+            services.restore_article(
+                article_id=article.pk, actor=request.user, user_agent=user_agent
+            )
+            count += 1
+        self.message_user(request, f"Восстановлено статей: {count}.")
 
 
 @admin.register(ArticleRevision)

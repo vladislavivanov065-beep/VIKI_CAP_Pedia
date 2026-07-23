@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "apps.articles",
     "apps.images",
     "apps.search",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [

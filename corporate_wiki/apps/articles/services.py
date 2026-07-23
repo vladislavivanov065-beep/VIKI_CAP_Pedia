@@ -1,9 +1,8 @@
 """Business logic for articles and their revision history.
 
 Views call into this module instead of touching models directly (section
-13). Audit logging is a thin ``logging``-based placeholder, same as in
-``apps.accounts.services``, until the real ``AuditLog`` model lands in
-Stage 9.
+13). Every action is recorded both to the ``security`` logger (section
+18) and as an immutable ``AuditLog`` row (Stage 9).
 """
 
 from __future__ import annotations
@@ -19,6 +18,7 @@ from apps.accounts.models import User
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
 from apps.articles.markdown_ext import render_article_content
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision
+from apps.audit.services import record_event
 
 security_logger = logging.getLogger("security")
 
@@ -27,13 +27,23 @@ security_logger = logging.getLogger("security")
 RESERVED_SLUGS = {"create", "preview"}
 
 
-def _log_event(action: str, *, actor: User | None, article: Article, **metadata) -> None:
+def _log_event(
+    action: str, *, actor: User | None, article: Article, user_agent: str = "", **metadata
+) -> None:
     security_logger.info(
         "%s actor=%s article=%s metadata=%s",
         action,
         actor.email if actor else None,
         article.slug,
         metadata,
+    )
+    record_event(
+        actor=actor,
+        action=action,
+        object_type="article",
+        object_id=article.pk,
+        metadata={"slug": article.slug, **{k: str(v) for k, v in metadata.items()}},
+        user_agent=user_agent,
     )
 
 
@@ -80,6 +90,7 @@ def create_article(
     content_source: str,
     created_by: User,
     edit_summary: str = "",
+    user_agent: str = "",
 ) -> Article:
     title = title.strip()
     _assert_title_available(title)
@@ -105,7 +116,7 @@ def create_article(
         article.current_revision = revision
         article.save(update_fields=["current_revision", "updated_at"])
 
-    _log_event("article.created", actor=created_by, article=article)
+    _log_event("article.created", actor=created_by, article=article, user_agent=user_agent)
     return article
 
 
@@ -117,6 +128,7 @@ def update_article(
     content_source: str,
     edited_by: User,
     edit_summary: str = "",
+    user_agent: str = "",
 ) -> Article:
     """Save a new revision of an article's content (not its title).
 
@@ -145,7 +157,11 @@ def update_article(
         article.save(update_fields=["current_revision", "version", "updated_at"])
 
     _log_event(
-        "article.edited", actor=edited_by, article=article, revision=revision.revision_number
+        "article.edited",
+        actor=edited_by,
+        article=article,
+        user_agent=user_agent,
+        revision=revision.revision_number,
     )
     return article
 
@@ -158,6 +174,7 @@ def rename_article(
     article_version: int,
     edited_by: User,
     edit_summary: str = "",
+    user_agent: str = "",
 ) -> Article:
     new_title = new_title.strip()
 
@@ -205,11 +222,17 @@ def rename_article(
         if old_slug != new_slug:
             ArticleRedirect.objects.create(old_slug=old_slug, article=article, created_by=edited_by)
 
-    _log_event("article.renamed", actor=edited_by, article=article, old_slug=old_slug)
+    _log_event(
+        "article.renamed",
+        actor=edited_by,
+        article=article,
+        user_agent=user_agent,
+        old_slug=old_slug,
+    )
     return article
 
 
-def archive_article(*, article_id: uuid.UUID, actor: User) -> Article:
+def archive_article(*, article_id: uuid.UUID, actor: User, user_agent: str = "") -> Article:
     with transaction.atomic():
         article = Article.objects.select_for_update().get(pk=article_id)
         article.is_archived = True
@@ -217,11 +240,11 @@ def archive_article(*, article_id: uuid.UUID, actor: User) -> Article:
         article.archived_by = actor
         article.save(update_fields=["is_archived", "archived_at", "archived_by", "updated_at"])
 
-    _log_event("article.archived", actor=actor, article=article)
+    _log_event("article.archived", actor=actor, article=article, user_agent=user_agent)
     return article
 
 
-def restore_article(*, article_id: uuid.UUID, actor: User) -> Article:
+def restore_article(*, article_id: uuid.UUID, actor: User, user_agent: str = "") -> Article:
     with transaction.atomic():
         article = Article.objects.select_for_update().get(pk=article_id)
         _assert_title_available(article.title, exclude_article_id=article.pk)
@@ -231,7 +254,7 @@ def restore_article(*, article_id: uuid.UUID, actor: User) -> Article:
         article.archived_by = None
         article.save(update_fields=["is_archived", "archived_at", "archived_by", "updated_at"])
 
-    _log_event("article.restored", actor=actor, article=article)
+    _log_event("article.restored", actor=actor, article=article, user_agent=user_agent)
     return article
 
 
@@ -242,6 +265,7 @@ def restore_revision(
     base_revision_id,
     article_version: int,
     actor: User,
+    user_agent: str = "",
 ) -> Article:
     with transaction.atomic():
         article = Article.objects.select_for_update().get(pk=article_id)
@@ -266,5 +290,11 @@ def restore_revision(
         article.version = next_number
         article.save(update_fields=["current_revision", "version", "updated_at"])
 
-    _log_event("revision.restored", actor=actor, article=article, restored_revision=revision_number)
+    _log_event(
+        "revision.restored",
+        actor=actor,
+        article=article,
+        user_agent=user_agent,
+        restored_revision=revision_number,
+    )
     return article

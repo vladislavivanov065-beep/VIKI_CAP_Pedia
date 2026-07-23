@@ -38,6 +38,11 @@ class ForcedPasswordChangeView(PasswordChangeView):
     form_class = ForcedPasswordChangeForm
     success_url = reverse_lazy("home")
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.request = self.request
+        return form
+
     def form_valid(self, form):
         response = super().form_valid(form)
         messages.success(self.request, "Пароль успешно изменён.")

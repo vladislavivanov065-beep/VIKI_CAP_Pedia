@@ -3,9 +3,10 @@
 Views and admin forms call into this module instead of touching models
 directly, per the project's service-layer rule (see TЗ section 13).
 
-Audit logging here is a thin ``logging``-based placeholder (section 18)
-until the ``AuditLog`` model lands in Stage 9, at which point these calls
-will also persist a row instead of only writing to the security log.
+Every security-relevant action here is recorded twice: once to the
+``security`` logger (section 18) and once as an immutable ``AuditLog``
+row (section 12.7/Stage 9). Callers pass ``user_agent`` when they have a
+request to read it from; it defaults to empty for management commands.
 """
 
 from __future__ import annotations
@@ -18,12 +19,18 @@ from django.contrib.sessions.models import Session
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.audit.services import record_event
 
 security_logger = logging.getLogger("security")
 
 
 def _log_security_event(
-    action: str, actor: User | None, target: User | None, **metadata: Any
+    action: str,
+    actor: User | None,
+    target: User | None,
+    *,
+    user_agent: str = "",
+    **metadata: Any,
 ) -> None:
     security_logger.info(
         "%s actor=%s target=%s metadata=%s",
@@ -31,6 +38,14 @@ def _log_security_event(
         actor.email if actor else None,
         target.email if target else None,
         metadata,
+    )
+    record_event(
+        actor=actor,
+        action=action,
+        object_type="user",
+        object_id=target.pk if target else None,
+        metadata={k: str(v) for k, v in metadata.items()},
+        user_agent=user_agent,
     )
 
 
@@ -43,6 +58,7 @@ def create_user_with_temporary_password(
     is_staff: bool = False,
     is_superuser: bool = False,
     created_by: User | None = None,
+    user_agent: str = "",
 ) -> User:
     """Create a new user; ``must_change_password`` defaults to True."""
     user = User.objects.create_user(
@@ -53,11 +69,11 @@ def create_user_with_temporary_password(
         is_staff=is_staff,
         is_superuser=is_superuser,
     )
-    _log_security_event("user.created", actor=created_by, target=user)
+    _log_security_event("user.created", actor=created_by, target=user, user_agent=user_agent)
     return user
 
 
-def change_user_password(*, user: User, new_password: str) -> User:
+def change_user_password(*, user: User, new_password: str, user_agent: str = "") -> User:
     """Self-service password change after the old password was verified."""
     user.set_password(new_password)
     user.must_change_password = False
@@ -65,11 +81,13 @@ def change_user_password(*, user: User, new_password: str) -> User:
     user.save(
         update_fields=["password", "must_change_password", "password_changed_at", "updated_at"]
     )
-    _log_security_event("user.password_changed", actor=user, target=user)
+    _log_security_event("user.password_changed", actor=user, target=user, user_agent=user_agent)
     return user
 
 
-def reset_user_password_by_admin(*, user: User, new_temporary_password: str, actor: User) -> User:
+def reset_user_password_by_admin(
+    *, user: User, new_temporary_password: str, actor: User, user_agent: str = ""
+) -> User:
     """Administrator sets a new temporary password for another user.
 
     Forces a mandatory password change on next login and terminates every
@@ -88,7 +106,9 @@ def reset_user_password_by_admin(*, user: User, new_temporary_password: str, act
         ]
     )
     invalidate_user_sessions(user)
-    _log_security_event("user.password_reset_by_admin", actor=actor, target=user)
+    _log_security_event(
+        "user.password_reset_by_admin", actor=actor, target=user, user_agent=user_agent
+    )
     return user
 
 
@@ -107,24 +127,32 @@ def invalidate_user_sessions(user: User) -> int:
     return deleted
 
 
-def set_force_password_change(*, user: User, actor: User, value: bool = True) -> User:
+def set_force_password_change(
+    *, user: User, actor: User, value: bool = True, user_agent: str = ""
+) -> User:
     """Administrator toggles the forced-password-change flag directly."""
     user.must_change_password = value
     user.save(update_fields=["must_change_password", "updated_at"])
-    _log_security_event("user.force_password_change_set", actor=actor, target=user, value=value)
+    _log_security_event(
+        "user.force_password_change_set",
+        actor=actor,
+        target=user,
+        user_agent=user_agent,
+        value=value,
+    )
     return user
 
 
-def deactivate_user(*, user: User, actor: User) -> User:
+def deactivate_user(*, user: User, actor: User, user_agent: str = "") -> User:
     user.is_active = False
     user.save(update_fields=["is_active", "updated_at"])
     invalidate_user_sessions(user)
-    _log_security_event("user.deactivated", actor=actor, target=user)
+    _log_security_event("user.deactivated", actor=actor, target=user, user_agent=user_agent)
     return user
 
 
-def activate_user(*, user: User, actor: User) -> User:
+def activate_user(*, user: User, actor: User, user_agent: str = "") -> User:
     user.is_active = True
     user.save(update_fields=["is_active", "updated_at"])
-    _log_security_event("user.activated", actor=actor, target=user)
+    _log_security_event("user.activated", actor=actor, target=user, user_agent=user_agent)
     return user

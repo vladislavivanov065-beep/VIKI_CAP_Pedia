@@ -20,6 +20,7 @@ from django.conf import settings
 from PIL import Image, ImageOps
 
 from apps.accounts.models import User
+from apps.audit.services import record_event
 from apps.images.exceptions import (
     ImageDimensionsTooLargeError,
     ImageTooLargeError,
@@ -64,6 +65,7 @@ def upload_article_image(
     uploaded_by: User,
     alt_text: str = "",
     caption: str = "",
+    user_agent: str = "",
 ) -> ArticleImage:
     raw_bytes = _read_all(file_obj)
 
@@ -107,7 +109,7 @@ def upload_article_image(
     if existing is not None:
         return existing
 
-    return ArticleImage.objects.create(
+    image_obj = ArticleImage.objects.create(
         data=encoded_data,
         thumbnail_data=thumbnail_data,
         original_filename=(original_filename or "")[:255],
@@ -120,3 +122,15 @@ def upload_article_image(
         uploaded_by=uploaded_by,
         checksum=checksum,
     )
+    record_event(
+        actor=uploaded_by,
+        action="image.uploaded",
+        object_type="image",
+        object_id=image_obj.pk,
+        metadata={
+            "original_filename": image_obj.original_filename,
+            "mime_type": image_obj.mime_type,
+        },
+        user_agent=user_agent,
+    )
+    return image_obj

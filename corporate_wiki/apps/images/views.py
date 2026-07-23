@@ -56,6 +56,7 @@ def image_upload(request):
             uploaded_by=request.user,
             alt_text=request.POST.get("alt_text", ""),
             caption=request.POST.get("caption", ""),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
     except InvalidImageError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
