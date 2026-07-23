@@ -7,7 +7,14 @@
         <h1>Результаты поиска</h1>
         <form method="get" action="{% url 'search:search' %}" role="search">
             <div class="form-row">
-                <input type="search" name="q" value="{{ query }}" placeholder="Поиск по базе знаний">
+                <label for="search-results-input" class="skip-link">Поиск по базе знаний</label>
+                <input
+                    id="search-results-input"
+                    type="search"
+                    name="q"
+                    value="{{ query }}"
+                    placeholder="Поиск по базе знаний"
+                >
                 <button type="submit" class="button--primary">Найти</button>
             </div>
         </form>

@@ -9,7 +9,7 @@
         <form method="post" class="article-form" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}
-                <ul class="form-errors">
+                <ul class="form-errors" role="alert">
                     {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
                 </ul>
             {% endif %}
@@ -17,7 +17,7 @@
             <div class="form-row">
                 {{ form.title.label_tag }}
                 {{ form.title }}
-                {% for error in form.title.errors %}<ul class="form-errors"><li>{{ error }}</li></ul>{% endfor %}
+                {% for error in form.title.errors %}<ul class="form-errors" role="alert"><li>{{ error }}</li></ul>{% endfor %}
             </div>
 
             <div class="form-row">
@@ -31,14 +31,20 @@
                     {{ form.content_source }}
                 </div>
                 <div class="editor-layout__pane">
-                    <label>Предварительный просмотр</label>
-                    <div class="content-card content-card--article article-preview" id="article-preview">
+                    <p id="article-preview-label" class="preview-label">Предварительный просмотр</p>
+                    <div
+                        class="content-card content-card--article article-preview"
+                        id="article-preview"
+                        role="region"
+                        aria-labelledby="article-preview-label"
+                        aria-live="polite"
+                    >
                         <p class="text-secondary">Нажмите «Предпросмотр», чтобы увидеть, как будет выглядеть статья.</p>
                     </div>
                 </div>
             </div>
 
-            <input type="file" data-image-input accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+            {% include "includes/image_insert_panel.html" %}
 
             <div class="form-row">
                 <button type="button" class="button" data-image-upload>Добавить изображение</button>

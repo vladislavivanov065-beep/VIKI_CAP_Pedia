@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Безопасность — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Безопасность</h1>
+
+        <h2>Пароль</h2>
+        <p>
+            <a class="button" href="{% url 'accounts:password_change' %}">Изменить пароль</a>
+        </p>
+
+        <h2>Активные сессии</h2>
+        <p class="text-secondary">
+            Если вы входили в систему с другого устройства или браузера и хотите завершить
+            эти сессии, не выходя из текущей, используйте кнопку ниже.
+        </p>
+        <form method="post" action="{% url 'accounts:terminate_other_sessions' %}">
+            {% csrf_token %}
+            <button type="submit" class="button--primary">Завершить другие активные сессии</button>
+        </form>
+    </div>
+{% endblock %}

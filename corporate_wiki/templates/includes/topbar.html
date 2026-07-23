@@ -24,7 +24,7 @@
         <details class="user-menu">
             <summary>{{ user.display_name }}</summary>
             <div class="user-menu__panel">
-                <a href="/settings/profile/">Настройки профиля</a>
+                <a href="{% url 'accounts:security_settings' %}">Безопасность</a>
                 {% if user.is_staff %}
                     <a href="{% url 'admin:index' %}">Django Admin</a>
                 {% endif %}

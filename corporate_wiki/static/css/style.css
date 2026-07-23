@@ -575,15 +575,16 @@ a.external-link::after {
 }
 
 .toc {
-    float: left;
+    /* Floats left only on wide (desktop) screens — see the min-width:1200px
+       override below. At narrower widths a float creates an awkward
+       ragged wrap where body text drops to full width once it clears the
+       box, so tablet/mobile just get a plain block above the content. */
     max-width: 320px;
-    margin: 0 1.5rem 1rem 0;
+    margin: 0 0 1rem;
     padding: 0.75rem 1rem;
     background: var(--background-page);
     border: 1px solid var(--border-light);
     border-radius: 4px;
-    position: sticky;
-    top: calc(var(--topbar-height) + 1rem);
 }
 
 .toc summary {
@@ -594,6 +595,20 @@ a.external-link::after {
 .toc ul {
     margin: 0.5rem 0 0;
     padding-left: 1.25rem;
+}
+
+.toc__current {
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+@media (min-width: 1200px) {
+    .toc {
+        float: left;
+        margin: 0 1.5rem 1rem 0;
+        position: sticky;
+        top: calc(var(--topbar-height) + 1rem);
+    }
 }
 
 .editor-layout {
@@ -619,11 +634,32 @@ a.external-link::after {
     overflow-y: auto;
 }
 
+.preview-label {
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+}
+
+.hidden-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.image-insert-panel {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-page);
+    max-width: 480px;
+}
+
 @media (max-width: 767px) {
     .toc {
-        float: none;
         max-width: none;
-        position: static;
     }
 
     .editor-layout {

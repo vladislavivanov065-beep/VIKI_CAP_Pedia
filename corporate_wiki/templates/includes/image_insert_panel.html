@@ -1,0 +1,25 @@
+<input
+    type="file"
+    id="article-image-input"
+    data-image-input
+    accept="image/png,image/jpeg,image/webp,image/gif"
+    class="hidden-file-input"
+    aria-hidden="true"
+    tabindex="-1"
+>
+
+<div class="image-insert-panel" data-image-panel hidden>
+    <p>Файл: <strong data-image-filename></strong></p>
+    <div class="form-row">
+        <label for="article-image-alt">Альтернативный текст (обязательно, для доступности)</label>
+        <input type="text" id="article-image-alt" data-image-alt required>
+    </div>
+    <div class="form-row">
+        <label for="article-image-caption">Подпись к изображению (необязательно)</label>
+        <input type="text" id="article-image-caption" data-image-caption>
+    </div>
+    <div class="form-row">
+        <button type="button" class="button--primary" data-image-confirm>Вставить изображение</button>
+        <button type="button" class="button" data-image-cancel>Отмена</button>
+    </div>
+</div>

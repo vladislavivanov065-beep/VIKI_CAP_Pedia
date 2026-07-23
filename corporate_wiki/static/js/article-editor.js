@@ -17,9 +17,11 @@
         textarea.focus();
     }
 
-    function uploadImage(file, textarea) {
+    function uploadImage(file, altText, caption, textarea, onDone) {
         var formData = new FormData();
         formData.append("file", file);
+        formData.append("alt_text", altText || "");
+        formData.append("caption", caption || "");
 
         fetch("/images/upload/", {
             method: "POST",
@@ -33,14 +35,18 @@
             })
             .then(function (result) {
                 if (result.ok) {
-                    insertAtCursor(textarea, result.data.markdown + "\n");
+                    var snippet = caption
+                        ? "![[image:" + result.data.id + "|" + caption + "]]"
+                        : result.data.markdown;
+                    insertAtCursor(textarea, snippet + "\n");
                 } else {
                     window.alert(result.data.error || "Не удалось загрузить изображение.");
                 }
             })
             .catch(function () {
                 window.alert("Не удалось загрузить изображение.");
-            });
+            })
+            .then(onDone);
     }
 
     function wirePreview(form, textarea) {
@@ -76,17 +82,48 @@
         });
     }
 
+    function guessAltFromFilename(filename) {
+        return (filename || "").replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+    }
+
     function wireImageUpload(form, textarea) {
         var uploadButton = form.querySelector("[data-image-upload]");
         var fileInput = form.querySelector("[data-image-input]");
+        var panel = form.querySelector("[data-image-panel]");
+        if (!panel) {
+            return;
+        }
+        var filenameLabel = panel.querySelector("[data-image-filename]");
+        var altInput = panel.querySelector("[data-image-alt]");
+        var captionInput = panel.querySelector("[data-image-caption]");
+        var confirmButton = panel.querySelector("[data-image-confirm]");
+        var cancelButton = panel.querySelector("[data-image-cancel]");
+        var pendingFile = null;
+
+        function openPanel(file) {
+            pendingFile = file;
+            filenameLabel.textContent = file.name;
+            altInput.value = guessAltFromFilename(file.name);
+            captionInput.value = "";
+            panel.hidden = false;
+            altInput.focus();
+        }
+
+        function closePanel() {
+            pendingFile = null;
+            panel.hidden = true;
+            if (fileInput) {
+                fileInput.value = "";
+            }
+        }
+
         if (uploadButton && fileInput) {
             uploadButton.addEventListener("click", function () {
                 fileInput.click();
             });
             fileInput.addEventListener("change", function () {
                 if (fileInput.files && fileInput.files[0]) {
-                    uploadImage(fileInput.files[0], textarea);
-                    fileInput.value = "";
+                    openPanel(fileInput.files[0]);
                 }
             });
         }
@@ -98,9 +135,34 @@
             event.preventDefault();
             var file = event.dataTransfer && event.dataTransfer.files[0];
             if (file) {
-                uploadImage(file, textarea);
+                openPanel(file);
             }
         });
+
+        if (confirmButton) {
+            confirmButton.addEventListener("click", function () {
+                if (!pendingFile) {
+                    return;
+                }
+                if (!altInput.value.trim()) {
+                    altInput.focus();
+                    altInput.setCustomValidity("Укажите альтернативный текст для изображения.");
+                    altInput.reportValidity();
+                    return;
+                }
+                altInput.setCustomValidity("");
+                var file = pendingFile;
+                confirmButton.disabled = true;
+                uploadImage(file, altInput.value.trim(), captionInput.value.trim(), textarea, function () {
+                    confirmButton.disabled = false;
+                    closePanel();
+                });
+            });
+        }
+
+        if (cancelButton) {
+            cancelButton.addEventListener("click", closePanel);
+        }
     }
 
     document.querySelectorAll("form.article-form").forEach(function (form) {
