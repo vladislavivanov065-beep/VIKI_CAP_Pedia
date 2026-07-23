@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{{ site_name }}</title>
+</head>
+<body>
+    <h1>{{ site_name }}</h1>
+    <p>Здравствуйте, {{ user.display_name }}.</p>
+    <p><a href="{% url 'accounts:logout' %}">Выйти</a></p>
+</body>
+</html>

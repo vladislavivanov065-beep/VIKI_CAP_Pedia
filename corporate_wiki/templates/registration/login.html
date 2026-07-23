@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Вход — {{ site_name }}</title>
+</head>
+<body>
+    <h1>{{ site_name }}</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <p>
+                {{ field.label_tag }}
+                {{ field }}
+                {{ field.errors }}
+            </p>
+        {% endfor %}
+        <button type="submit">Войти</button>
+    </form>
+    <p>Если вы забыли пароль, обратитесь к администратору.</p>
+</body>
+</html>
