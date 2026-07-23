@@ -6,7 +6,7 @@
         <span class="topbar__logo" aria-hidden="true">{{ site_name|slice:":1" }}</span>
         <span>{{ site_name }}</span>
     </a>
-    <form class="topbar__search" action="/search/" method="get" role="search">
+    <form class="topbar__search" action="{% url 'search:search' %}" method="get" role="search">
         <label for="topbar-search-input" class="skip-link">Поиск по базе знаний</label>
         <input
             id="topbar-search-input"
@@ -14,7 +14,10 @@
             name="q"
             placeholder="Поиск по базе знаний"
             autocomplete="off"
+            data-search-suggestions
+            data-suggestions-url="{% url 'search:suggestions' %}"
         >
+        <ul class="search-suggestions" data-suggestions-list hidden></ul>
     </form>
     <div class="topbar__spacer"></div>
     {% if user.is_authenticated %}

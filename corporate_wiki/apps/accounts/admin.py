@@ -187,6 +187,7 @@ class UserAdmin(admin.ModelAdmin):
                 is_staff=form.cleaned_data.get("is_staff", False),
                 is_superuser=form.cleaned_data.get("is_superuser", False),
                 created_by=request.user,
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
             )
             # `obj` is the transient instance built by the ModelForm; point it
             # at the row the service actually created so the rest of the
@@ -219,6 +220,7 @@ class UserAdmin(admin.ModelAdmin):
                     user=user_obj,
                     new_temporary_password=form.cleaned_data["new_temporary_password1"],
                     actor=request.user,
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
                 )
                 self.message_user(
                     request,

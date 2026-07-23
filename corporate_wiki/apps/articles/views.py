@@ -26,6 +26,7 @@ def article_create(request):
                     content_source=form.cleaned_data["content_source"],
                     edit_summary=form.cleaned_data["edit_summary"],
                     created_by=request.user,
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
                 )
             except ArticleTitleConflict as exc:
                 form.add_error("title", str(exc))
@@ -92,6 +93,7 @@ def article_edit(request, slug: str):
                     content_source=form.cleaned_data["content_source"],
                     edit_summary=form.cleaned_data["edit_summary"],
                     edited_by=request.user,
+                    user_agent=request.META.get("HTTP_USER_AGENT", ""),
                 )
             except ArticleEditConflict as exc:
                 messages.error(
@@ -235,6 +237,7 @@ def article_restore(request, slug: str, revision_number: int):
             base_revision_id=request.POST.get("base_revision_id") or None,
             article_version=article_version,
             actor=request.user,
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
     except ArticleEditConflict:
         messages.error(

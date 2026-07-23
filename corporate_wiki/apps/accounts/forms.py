@@ -77,7 +77,11 @@ class ForcedPasswordChangeForm(PasswordChangeForm):
 
     def save(self, commit: bool = True) -> User:
         if commit:
+            request = getattr(self, "request", None)
+            user_agent = request.META.get("HTTP_USER_AGENT", "") if request else ""
             services.change_user_password(
-                user=self.user, new_password=self.cleaned_data["new_password1"]
+                user=self.user,
+                new_password=self.cleaned_data["new_password1"],
+                user_agent=user_agent,
             )
         return self.user
