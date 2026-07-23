@@ -560,10 +560,13 @@ a.external-link::after {
 .article-body figure {
     margin: 1rem 0;
     text-align: center;
+    max-width: 100%;
 }
 
 .article-body figure img {
     max-width: 100%;
+    display: block;
+    margin: 0 auto;
     border: 1px solid var(--border-light);
     border-radius: 4px;
 }
@@ -572,6 +575,45 @@ a.external-link::after {
     color: var(--text-secondary);
     font-size: 0.9rem;
     margin-top: 0.4rem;
+}
+
+/* Image layout "constructor" (align/size options in the ![[image:...]]
+   embed syntax) — a fixed set of presets, not free-form sizing, so a
+   malformed option can never break the page layout. */
+.article-body figure.wiki-image--align-left {
+    float: left;
+    margin: 0.25rem 1.5rem 1rem 0;
+}
+
+.article-body figure.wiki-image--align-right {
+    float: right;
+    margin: 0.25rem 0 1rem 1.5rem;
+}
+
+.article-body figure.wiki-image--align-center {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.article-body figure.wiki-image--size-small img {
+    max-width: 200px;
+}
+
+.article-body figure.wiki-image--size-medium img {
+    max-width: 350px;
+}
+
+.article-body figure.wiki-image--size-large img {
+    max-width: 500px;
+}
+
+.article-body figure.wiki-image--size-full img {
+    max-width: 100%;
+}
+
+.article-body h2,
+.article-body h3 {
+    clear: both;
 }
 
 .toc {

@@ -190,3 +190,56 @@ def test_image_embed_does_not_get_treated_as_wikilink():
     html, _toc = render_article_content("![[image:not-a-real-uuid]]")
     assert "<img" not in html
     assert "изображение не найдено" in html
+
+
+def test_image_embed_with_align_and_size_options():
+    from io import BytesIO
+
+    from apps.images import services
+    from apps.images.tests.factories import make_image_bytes
+
+    user = UserFactory()
+    image = services.upload_article_image(
+        file_obj=BytesIO(make_image_bytes()),
+        original_filename="a.png",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"![[image:{image.pk}|Подпись|align=left;size=medium]]")
+    assert 'class="wiki-image--align-left wiki-image--size-medium"' in html
+    assert "<figcaption>Подпись</figcaption>" in html
+
+
+def test_image_embed_with_options_but_no_caption():
+    from io import BytesIO
+
+    from apps.images import services
+    from apps.images.tests.factories import make_image_bytes
+
+    user = UserFactory()
+    image = services.upload_article_image(
+        file_obj=BytesIO(make_image_bytes()),
+        original_filename="a.png",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"![[image:{image.pk}||align=right]]")
+    assert 'class="wiki-image--align-right"' in html
+    assert "<figcaption>" not in html
+
+
+def test_image_embed_ignores_unknown_options():
+    from io import BytesIO
+
+    from apps.images import services
+    from apps.images.tests.factories import make_image_bytes
+
+    user = UserFactory()
+    image = services.upload_article_image(
+        file_obj=BytesIO(make_image_bytes()),
+        original_filename="a.png",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"![[image:{image.pk}|Подпись|align=diagonal]]")
+    assert "<figure>" in html
