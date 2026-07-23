@@ -4,13 +4,20 @@
 
 ```bash
 cp .env.example .env
+# указать ADMIN_USERNAME и ADMIN_TEMP_PASSWORD в .env
 docker compose up --build
-docker compose exec web python manage.py migrate
-docker compose exec web python manage.py createsuperuser
-docker compose exec web pytest
 ```
 
+При старте контейнер автоматически применяет миграции, собирает
+статику и создаёт первого администратора с логином/паролем из
+`ADMIN_USERNAME`/`ADMIN_TEMP_PASSWORD` — если суперпользователь уже
+есть, этот шаг пропускается (безопасно при перезапуске контейнера).
+
 Приложение — `http://localhost:8000`.
+
+```bash
+docker compose exec web pytest
+```
 
 ## Без Docker
 
