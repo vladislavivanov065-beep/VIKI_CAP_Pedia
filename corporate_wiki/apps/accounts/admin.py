@@ -22,7 +22,7 @@ class AdminUserCreationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "is_active", "is_staff", "is_superuser"]
+        fields = ["username", "first_name", "last_name", "is_active", "is_staff", "is_superuser"]
 
     def clean(self):
         cleaned_data = super().clean()
@@ -34,7 +34,7 @@ class AdminUserCreationForm(forms.ModelForm):
 
         if password1:
             transient_user = User(
-                email=cleaned_data.get("email", ""),
+                username=cleaned_data.get("username", ""),
                 first_name=cleaned_data.get("first_name", ""),
                 last_name=cleaned_data.get("last_name", ""),
             )
@@ -55,7 +55,7 @@ class AdminUserChangeForm(forms.ModelForm):
     class Meta:
         model = User
         fields = [
-            "email",
+            "username",
             "first_name",
             "last_name",
             "is_active",
@@ -103,7 +103,7 @@ class UserAdmin(admin.ModelAdmin):
     model = User
 
     list_display = [
-        "email",
+        "username",
         "display_name",
         "is_active",
         "is_staff",
@@ -111,8 +111,8 @@ class UserAdmin(admin.ModelAdmin):
         "created_at",
     ]
     list_filter = ["is_active", "is_staff", "is_superuser", "must_change_password"]
-    search_fields = ["email", "first_name", "last_name"]
-    ordering = ["email"]
+    search_fields = ["username", "first_name", "last_name"]
+    ordering = ["username"]
     filter_horizontal = ["groups", "user_permissions"]
 
     readonly_fields = [
@@ -125,7 +125,7 @@ class UserAdmin(admin.ModelAdmin):
     ]
 
     fieldsets = (
-        (None, {"fields": ("email",)}),
+        (None, {"fields": ("username",)}),
         ("Личные данные", {"fields": ("first_name", "last_name")}),
         (
             "Права доступа",
@@ -149,7 +149,7 @@ class UserAdmin(admin.ModelAdmin):
             None,
             {
                 "fields": (
-                    "email",
+                    "username",
                     "first_name",
                     "last_name",
                     "temporary_password1",
@@ -180,7 +180,7 @@ class UserAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if not change:
             created_user = services.create_user_with_temporary_password(
-                email=form.cleaned_data["email"],
+                username=form.cleaned_data["username"],
                 temporary_password=form.cleaned_data["temporary_password1"],
                 first_name=form.cleaned_data.get("first_name", ""),
                 last_name=form.cleaned_data.get("last_name", ""),

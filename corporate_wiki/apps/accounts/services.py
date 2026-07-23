@@ -35,8 +35,8 @@ def _log_security_event(
     security_logger.info(
         "%s actor=%s target=%s metadata=%s",
         action,
-        actor.email if actor else None,
-        target.email if target else None,
+        actor.username if actor else None,
+        target.username if target else None,
         metadata,
     )
     record_event(
@@ -51,7 +51,7 @@ def _log_security_event(
 
 def create_user_with_temporary_password(
     *,
-    email: str,
+    username: str,
     temporary_password: str,
     first_name: str = "",
     last_name: str = "",
@@ -60,9 +60,13 @@ def create_user_with_temporary_password(
     created_by: User | None = None,
     user_agent: str = "",
 ) -> User:
-    """Create a new user; ``must_change_password`` defaults to True."""
+    """Create a new user; ``must_change_password`` defaults to True.
+
+    ``first_name``/``last_name`` may be left blank — an administrator is
+    allowed to create a user with no name on file.
+    """
     user = User.objects.create_user(
-        email=email,
+        username=username,
         password=temporary_password,
         first_name=first_name,
         last_name=last_name,
@@ -70,6 +74,40 @@ def create_user_with_temporary_password(
         is_superuser=is_superuser,
     )
     _log_security_event("user.created", actor=created_by, target=user, user_agent=user_agent)
+    return user
+
+
+def update_profile(
+    *,
+    user: User,
+    username: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    user_agent: str = "",
+) -> User:
+    """Self-service update of login/first name/last name.
+
+    All three are optional — pass ``None`` (not an empty string) for any
+    field that should be left untouched. An empty string for
+    ``first_name``/``last_name`` clears the name; an empty/``None``
+    ``username`` never changes the login, since it must stay set for the
+    user to be able to log in.
+    """
+    update_fields = ["updated_at"]
+    if username and username != user.username:
+        user.username = username
+        update_fields.append("username")
+    if first_name is not None and first_name != user.first_name:
+        user.first_name = first_name
+        update_fields.append("first_name")
+    if last_name is not None and last_name != user.last_name:
+        user.last_name = last_name
+        update_fields.append("last_name")
+
+    if len(update_fields) > 1:
+        user.full_clean(exclude=["password"])
+        user.save(update_fields=update_fields)
+        _log_security_event("user.profile_updated", actor=user, target=user, user_agent=user_agent)
     return user
 
 

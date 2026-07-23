@@ -11,7 +11,7 @@ def test_create_user_with_temporary_password_is_audited():
     admin = UserFactory(is_staff=True, is_superuser=True)
 
     user = services.create_user_with_temporary_password(
-        email="new@example.com",
+        username="new",
         temporary_password="TempPassw0rd!77",
         created_by=admin,
         user_agent="pytest-agent",

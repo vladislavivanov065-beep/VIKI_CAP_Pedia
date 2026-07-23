@@ -7,7 +7,7 @@ from apps.audit.models import AuditLog
 class AuditLogAdmin(admin.ModelAdmin):
     list_display = ["created_at", "action", "actor", "object_type", "object_id"]
     list_filter = ["action"]
-    search_fields = ["action", "object_type", "actor__email"]
+    search_fields = ["action", "object_type", "actor__username"]
     date_hierarchy = "created_at"
     readonly_fields = [f.name for f in AuditLog._meta.fields]
 

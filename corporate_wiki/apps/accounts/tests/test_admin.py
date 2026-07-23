@@ -20,9 +20,9 @@ def test_admin_can_create_user_with_temporary_password(admin_client_logged_in):
     response = admin_client.post(
         reverse("admin:accounts_user_add"),
         {
-            "email": "newperson@example.com",
-            "first_name": "Новый",
-            "last_name": "Сотрудник",
+            "username": "newperson",
+            "first_name": "",
+            "last_name": "",
             "temporary_password1": "TempPassw0rd!77",
             "temporary_password2": "TempPassw0rd!77",
             "is_active": "on",
@@ -30,9 +30,11 @@ def test_admin_can_create_user_with_temporary_password(admin_client_logged_in):
     )
 
     assert response.status_code == 302
-    created = User.objects.get(email="newperson@example.com")
+    created = User.objects.get(username="newperson")
     assert created.must_change_password is True
     assert created.check_password("TempPassw0rd!77")
+    assert created.first_name == ""
+    assert created.last_name == ""
 
 
 def test_admin_add_form_rejects_mismatched_temporary_passwords(admin_client_logged_in):
@@ -41,14 +43,14 @@ def test_admin_add_form_rejects_mismatched_temporary_passwords(admin_client_logg
     response = admin_client.post(
         reverse("admin:accounts_user_add"),
         {
-            "email": "mismatch@example.com",
+            "username": "mismatch",
             "temporary_password1": "TempPassw0rd!77",
             "temporary_password2": "SomethingElse!88",
         },
     )
 
     assert response.status_code == 200
-    assert not User.objects.filter(email="mismatch@example.com").exists()
+    assert not User.objects.filter(username="mismatch").exists()
 
 
 def test_admin_set_temporary_password_view_forces_change_and_logs_out_sessions(

@@ -30,10 +30,10 @@ def on_user_logged_out(sender, request, user, **kwargs):
 
 @receiver(user_login_failed)
 def on_user_login_failed(sender, credentials, request=None, **kwargs):
-    email = (credentials or {}).get("username", "")
+    username = (credentials or {}).get("username", "")
     record_event(
         actor=None,
         action="user.login_failed",
-        metadata={"email": email},
+        metadata={"username": username},
         user_agent=_user_agent(request),
     )

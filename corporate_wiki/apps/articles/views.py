@@ -146,6 +146,21 @@ def article_preview(request):
     return JsonResponse({"content_html": content_html, "toc_html": toc_html})
 
 
+def article_link_suggestions(request):
+    """Titles of existing articles, for the editor's wiki-link hints.
+
+    ``exclude`` skips the article currently being edited so it doesn't
+    suggest linking a page to itself.
+    """
+    articles = (
+        Article.objects.filter(is_archived=False)
+        .exclude(slug=request.GET.get("exclude", ""))
+        .order_by("title")
+        .values("title", "slug")
+    )
+    return JsonResponse({"articles": list(articles)})
+
+
 def article_history(request, slug: str):
     article = get_object_or_404(Article, slug=slug)
     revisions = list(selectors.get_article_history(article))  # newest first

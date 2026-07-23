@@ -9,7 +9,7 @@ from apps.accounts.models import User
 
 class Command(BaseCommand):
     help = (
-        "Bootstrap the first administrator from ADMIN_EMAIL/ADMIN_TEMP_PASSWORD. "
+        "Bootstrap the first administrator from ADMIN_USERNAME/ADMIN_TEMP_PASSWORD. "
         "Does nothing if a superuser already exists."
     )
 
@@ -18,29 +18,29 @@ class Command(BaseCommand):
             self.stdout.write("Суперпользователь уже существует, ничего не делаю.")
             return
 
-        email = settings.ADMIN_EMAIL
+        username = settings.ADMIN_USERNAME
         temporary_password = settings.ADMIN_TEMP_PASSWORD
 
-        if not email or not temporary_password:
+        if not username or not temporary_password:
             raise CommandError(
-                "ADMIN_EMAIL и ADMIN_TEMP_PASSWORD должны быть заданы в переменных окружения."
+                "ADMIN_USERNAME и ADMIN_TEMP_PASSWORD должны быть заданы " "в переменных окружения."
             )
 
-        transient_user = User(email=email.strip().lower())
+        transient_user = User(username=username.strip().lower())
         try:
             validate_password(temporary_password, user=transient_user)
         except ValidationError as exc:
             raise CommandError("Ненадёжный ADMIN_TEMP_PASSWORD: " + " ".join(exc.messages)) from exc
 
         user = services.create_user_with_temporary_password(
-            email=email,
+            username=username,
             temporary_password=temporary_password,
             is_staff=True,
             is_superuser=True,
         )
         self.stdout.write(
             self.style.SUCCESS(
-                f"Создан первый администратор {user.email}. "
+                f"Создан первый администратор {user.username}. "
                 "При первом входе потребуется сменить временный пароль."
             )
         )

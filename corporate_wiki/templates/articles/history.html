@@ -60,7 +60,7 @@
                             </td>
                             <td>{{ entry.revision.created_at|date:"d.m.Y H:i" }}</td>
                             <td>{{ entry.revision.edited_by.display_name }}</td>
-                            {% if user.is_staff %}<td>{{ entry.revision.edited_by.email }}</td>{% endif %}
+                            {% if user.is_staff %}<td>{{ entry.revision.edited_by.username }}</td>{% endif %}
                             <td>{{ entry.revision.edit_summary }}</td>
                             <td>{{ entry.size }}</td>
                             <td>

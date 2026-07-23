@@ -197,3 +197,29 @@ def test_preview_endpoint_rejects_get(client):
 
     response = client.get(reverse("articles:preview"))
     assert response.status_code == 405
+
+
+def test_link_suggestions_lists_active_article_titles(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    services.create_article(title="CardsPro", content_source="x", created_by=user)
+    archived = services.create_article(title="Устаревшая", content_source="x", created_by=user)
+    services.archive_article(article_id=archived.pk, actor=user)
+
+    response = client.get(reverse("articles:link_suggestions"))
+
+    assert response.status_code == 200
+    titles = {a["title"] for a in response.json()["articles"]}
+    assert "CardsPro" in titles
+    assert "Устаревшая" not in titles
+
+
+def test_link_suggestions_excludes_given_slug(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = services.create_article(title="CardsPro", content_source="x", created_by=user)
+
+    response = client.get(reverse("articles:link_suggestions"), {"exclude": article.slug})
+
+    titles = {a["title"] for a in response.json()["articles"]}
+    assert "CardsPro" not in titles
