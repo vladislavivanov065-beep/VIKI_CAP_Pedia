@@ -1,0 +1,35 @@
+<header class="topbar">
+    <button type="button" class="topbar__menu-toggle" aria-label="Открыть меню разделов" aria-expanded="false">
+        ☰
+    </button>
+    <a class="topbar__brand" href="{% url 'home' %}">
+        <span class="topbar__logo" aria-hidden="true">{{ site_name|slice:":1" }}</span>
+        <span>{{ site_name }}</span>
+    </a>
+    <form class="topbar__search" action="/search/" method="get" role="search">
+        <label for="topbar-search-input" class="skip-link">Поиск по базе знаний</label>
+        <input
+            id="topbar-search-input"
+            type="search"
+            name="q"
+            placeholder="Поиск по базе знаний"
+            autocomplete="off"
+        >
+    </form>
+    <div class="topbar__spacer"></div>
+    {% if user.is_authenticated %}
+        <details class="user-menu">
+            <summary>{{ user.display_name }}</summary>
+            <div class="user-menu__panel">
+                <a href="/settings/profile/">Настройки профиля</a>
+                {% if user.is_staff %}
+                    <a href="{% url 'admin:index' %}">Django Admin</a>
+                {% endif %}
+                <form class="user-menu__form" method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit">Выйти</button>
+                </form>
+            </div>
+        </details>
+    {% endif %}
+</header>

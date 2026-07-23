@@ -1,23 +1,40 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="utf-8">
-    <title>Вход — {{ site_name }}</title>
-</head>
-<body>
-    <h1>{{ site_name }}</h1>
-    <form method="post">
+{% extends "base_auth.html" %}
+
+{% block title %}Вход — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <h1>Вход в систему</h1>
+    <form method="post" novalidate>
         {% csrf_token %}
-        {{ form.non_field_errors }}
+        {% if form.non_field_errors %}
+            <ul class="form-errors">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
         {% for field in form %}
-            <p>
-                {{ field.label_tag }}
-                {{ field }}
-                {{ field.errors }}
-            </p>
+            <div class="form-row">
+                {% if field.name != "remember_me" %}
+                    {{ field.label_tag }}
+                    {{ field }}
+                {% else %}
+                    <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: normal;">
+                        {{ field }} {{ field.label }}
+                    </label>
+                {% endif %}
+                {% if field.errors %}
+                    <ul class="form-errors">
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
         {% endfor %}
-        <button type="submit">Войти</button>
+        <button type="submit" class="button--primary">Войти</button>
     </form>
-    <p>Если вы забыли пароль, обратитесь к администратору.</p>
-</body>
-</html>
+    <p style="margin-top: 1rem; color: var(--text-secondary);">
+        Если вы забыли пароль, обратитесь к администратору.
+    </p>
+{% endblock %}

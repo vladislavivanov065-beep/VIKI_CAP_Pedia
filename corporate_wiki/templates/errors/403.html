@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Доступ запрещён — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card error-page">
+        <p class="error-page__code">403</p>
+        <h1>Доступ запрещён</h1>
+        <p>У вас нет прав для просмотра этой страницы.</p>
+        <p><a href="{% url 'home' %}">Вернуться на главную страницу</a></p>
+    </div>
+{% endblock %}

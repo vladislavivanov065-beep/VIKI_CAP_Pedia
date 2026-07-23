@@ -20,6 +20,16 @@ def test_login_with_correct_credentials_succeeds(client):
     assert client.session.get("_auth_user_id") is not None
 
 
+def test_login_page_shows_configured_site_name_not_request_host(client, settings):
+    settings.SITE_NAME = "Тестовая база знаний"
+
+    response = client.get(reverse("accounts:login"))
+
+    content = response.content.decode()
+    assert "Тестовая база знаний" in content
+    assert "testserver" not in content
+
+
 def test_login_is_case_insensitive_on_email(client):
     UserFactory(email="worker@example.com", must_change_password=False)
 

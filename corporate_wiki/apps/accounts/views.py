@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.urls import reverse_lazy
@@ -22,6 +23,14 @@ class EmailLoginView(LoginView):
         if self.request.user.must_change_password:
             return reverse_lazy("accounts:password_change")
         return super().get_success_url()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # LoginView injects site_name from django.contrib.sites (or a
+        # RequestSite fallback whose name is just request.get_host())
+        # unconditionally — override it with our own configured value.
+        context["site_name"] = settings.SITE_NAME
+        return context
 
 
 class ForcedPasswordChangeView(PasswordChangeView):

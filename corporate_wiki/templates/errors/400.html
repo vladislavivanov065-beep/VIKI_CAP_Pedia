@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Некорректный запрос — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card error-page">
+        <p class="error-page__code">400</p>
+        <h1>Некорректный запрос</h1>
+        <p>Сервер не смог обработать полученный запрос.</p>
+        <p><a href="{% url 'home' %}">Вернуться на главную страницу</a></p>
+    </div>
+{% endblock %}
