@@ -1,16 +1,19 @@
 """Minimal project-level views that don't belong to any single app yet.
 
-The real home page (search box, recent/popular articles, "my recent
-edits") lands once the articles app exists; this placeholder only proves
-the base template and navigation work end to end.
+The full home page (search box, popular articles, "my recent edits")
+still needs the search app (Stage 8) and audit log (Stage 9); this is an
+intermediate version once articles exist.
 """
 
 from django.contrib.auth.decorators import login_not_required
 from django.shortcuts import render
 
+from apps.articles import selectors
+
 
 def home(request):
-    return render(request, "pages/home.html")
+    recent_articles = selectors.get_recent_articles(limit=10)
+    return render(request, "pages/home.html", {"recent_articles": recent_articles})
 
 
 @login_not_required

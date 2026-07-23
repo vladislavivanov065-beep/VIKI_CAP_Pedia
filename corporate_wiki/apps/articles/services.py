@@ -17,9 +17,14 @@ from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
+from apps.articles.markdown_ext import render_article_content
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision
 
 security_logger = logging.getLogger("security")
+
+# Fixed URL segments under /articles/ that a generated slug must never
+# collide with (see apps/articles/urls.py).
+RESERVED_SLUGS = {"create", "preview"}
 
 
 def _log_event(action: str, *, actor: User | None, article: Article, **metadata) -> None:
@@ -40,7 +45,11 @@ def _generate_unique_slug(title: str, *, exclude_article_id: uuid.UUID | None = 
         taken = Article.objects.filter(slug=candidate)
         if exclude_article_id is not None:
             taken = taken.exclude(pk=exclude_article_id)
-        if not taken.exists() and not ArticleRedirect.objects.filter(old_slug=candidate).exists():
+        if (
+            candidate not in RESERVED_SLUGS
+            and not taken.exists()
+            and not ArticleRedirect.objects.filter(old_slug=candidate).exists()
+        ):
             return candidate
         candidate = f"{base}-{suffix}"
         suffix += 1
@@ -83,14 +92,13 @@ def create_article(
             created_by=created_by,
             version=1,
         )
+        content_html, _toc_html = render_article_content(content_source)
         revision = ArticleRevision.objects.create(
             article=article,
             revision_number=1,
             title=title,
             content_source=content_source,
-            # Markdown rendering + HTML sanitization land in Stage 5; until
-            # then content_html is a placeholder mirror of the source.
-            content_html=content_source,
+            content_html=content_html,
             edit_summary=edit_summary,
             edited_by=created_by,
         )
@@ -122,12 +130,13 @@ def update_article(
         )
 
         next_number = article.version + 1
+        content_html, _toc_html = render_article_content(content_source)
         revision = ArticleRevision.objects.create(
             article=article,
             revision_number=next_number,
             title=article.title,
             content_source=content_source,
-            content_html=content_source,
+            content_html=content_html,
             edit_summary=edit_summary,
             edited_by=edited_by,
         )

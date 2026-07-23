@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}История: {{ article.title }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <nav class="article-tabs" aria-label="Вкладки статьи">
+        <a class="article-tabs__tab" href="{% url 'articles:detail' slug=article.slug %}">Статья</a>
+        <a class="article-tabs__tab article-tabs__tab--active" href="{% url 'articles:history' slug=article.slug %}">История</a>
+    </nav>
+
+    <div class="content-card">
+        <div class="article-header">
+            <h1>История изменений: {{ article.title }}</h1>
+            <div class="article-actions">
+                <a class="button" href="{% url 'articles:detail' slug=article.slug %}">К статье</a>
+            </div>
+        </div>
+
+        <form method="get" action="{% url 'articles:compare' slug=article.slug %}">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>От</th>
+                        <th>До</th>
+                        <th>Версия</th>
+                        <th>Дата</th>
+                        <th>Автор</th>
+                        {% if user.is_staff %}<th>Email</th>{% endif %}
+                        <th>Описание изменения</th>
+                        <th>Размер</th>
+                        <th>Изменение</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in page_obj %}
+                        <tr>
+                            <td><input type="radio" name="from" value="{{ entry.revision.revision_number }}"></td>
+                            <td><input type="radio" name="to" value="{{ entry.revision.revision_number }}"></td>
+                            <td>
+                                <a href="{% url 'articles:revision_detail' slug=article.slug revision_number=entry.revision.revision_number %}">
+                                    №{{ entry.revision.revision_number }}
+                                </a>
+                                {% if entry.revision.restored_from %}
+                                    <span class="text-secondary">(восстановление)</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ entry.revision.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>{{ entry.revision.edited_by.display_name }}</td>
+                            {% if user.is_staff %}<td>{{ entry.revision.edited_by.email }}</td>{% endif %}
+                            <td>{{ entry.revision.edit_summary }}</td>
+                            <td>{{ entry.size }}</td>
+                            <td>
+                                {% if entry.size_diff > 0 %}
+                                    <span style="color: #14866d;">+{{ entry.size_diff }}</span>
+                                {% elif entry.size_diff < 0 %}
+                                    <span style="color: #ba0000;">{{ entry.size_diff }}</span>
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" class="button--primary">Сравнить выбранные версии</button>
+        </form>
+
+        {% if page_obj.has_other_pages %}
+            <nav class="pagination" aria-label="Страницы истории">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}">← Предыдущая</a>
+                {% endif %}
+                <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}">Следующая →</a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </div>
+{% endblock %}

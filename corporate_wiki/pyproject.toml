@@ -9,6 +9,8 @@ dependencies = [
     "whitenoise>=6.7",
     "pillow>=10.4",
     "gunicorn>=23.0",
+    "markdown>=3.7",
+    "nh3>=0.2",
 ]
 
 [project.optional-dependencies]

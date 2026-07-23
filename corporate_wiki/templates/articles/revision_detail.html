@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} (версия №{{ revision.revision_number }}) — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card content-card--article">
+        {% if not is_current %}
+            <div class="messages">
+                <p style="padding: 0.6rem 0.9rem; border-radius: 4px; background: #fff8e1; border: 1px solid #8b6d00;">
+                    Вы просматриваете версию №{{ revision.revision_number }} от {{ revision.created_at|date:"d.m.Y" }}.
+                    Автор изменения: {{ revision.edited_by.display_name }}.
+                    Это не текущая версия статьи.
+                </p>
+            </div>
+        {% endif %}
+
+        <div class="article-header">
+            <h1>{{ revision.title }}</h1>
+            <div class="article-actions">
+                <a class="button" href="{% url 'articles:detail' slug=article.slug %}">Текущая версия</a>
+                {% if previous_number %}
+                    <a class="button" href="{% url 'articles:revision_detail' slug=article.slug revision_number=previous_number %}">Предыдущая версия</a>
+                {% endif %}
+                {% if next_number %}
+                    <a class="button" href="{% url 'articles:revision_detail' slug=article.slug revision_number=next_number %}">Следующая версия</a>
+                {% endif %}
+                {% if not is_current %}
+                    <a class="button" href="{% url 'articles:compare' slug=article.slug %}?from={{ revision.revision_number }}&to={{ article.version }}">Сравнить с текущей</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not is_current %}
+            <form method="post" action="{% url 'articles:restore' slug=article.slug revision_number=revision.revision_number %}" style="margin-bottom: 1rem;">
+                {% csrf_token %}
+                <input type="hidden" name="base_revision_id" value="{{ article.current_revision_id }}">
+                <input type="hidden" name="article_version" value="{{ article.version }}">
+                <button type="submit" class="button--primary">Восстановить эту версию</button>
+            </form>
+        {% endif %}
+
+        {% if toc_html %}
+            <details class="toc" open>
+                <summary>Содержание</summary>
+                {{ toc_html|safe }}
+            </details>
+        {% endif %}
+
+        <div class="article-body">
+            {{ revision.content_html|safe }}
+        </div>
+    </div>
+{% endblock %}

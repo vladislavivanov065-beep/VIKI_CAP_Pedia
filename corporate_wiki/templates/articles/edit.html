@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Редактирование: {{ article.title }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Редактирование: {{ article.title }}</h1>
+
+        {% if conflict %}
+            <div class="messages">
+                <p class="error" style="padding: 0.6rem 0.9rem; border-radius: 4px; background: #fde7e9; border: 1px solid #ba0000;">
+                    Статью успел изменить другой пользователь. Ниже — текущая сохранённая версия
+                    и ваш вариант. Скопируйте нужные фрагменты и сохраните ещё раз.
+                </p>
+            </div>
+            <div class="editor-layout">
+                <div class="editor-layout__pane">
+                    <label>Текущая сохранённая версия</label>
+                    <div class="content-card content-card--article">{{ current_revision.content_html|safe }}</div>
+                </div>
+                <div class="editor-layout__pane">
+                    <label>Ваш вариант (ещё не сохранён)</label>
+                    <div class="content-card content-card--article">
+                        <pre style="white-space: pre-wrap;">{{ form.content_source.value }}</pre>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <form method="post" class="article-form" novalidate>
+            {% csrf_token %}
+            {{ form.base_revision_id }}
+            {{ form.article_version }}
+            {% if form.non_field_errors %}
+                <ul class="form-errors">
+                    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+
+            <div class="form-row">
+                {{ form.edit_summary.label_tag }}
+                {{ form.edit_summary }}
+            </div>
+
+            <div class="editor-layout">
+                <div class="editor-layout__pane">
+                    {{ form.content_source.label_tag }}
+                    {{ form.content_source }}
+                </div>
+                <div class="editor-layout__pane">
+                    <label>Предварительный просмотр</label>
+                    <div class="content-card content-card--article article-preview" id="article-preview">
+                        <p class="text-secondary">Нажмите «Предпросмотр», чтобы увидеть изменения.</p>
+                    </div>
+                </div>
+            </div>
+
+            <input type="file" data-image-input accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+
+            <div class="form-row">
+                <button type="button" class="button" data-image-upload>Добавить изображение</button>
+                <button type="button" class="button" data-preview-target="article-preview">Предпросмотр</button>
+                <button type="submit" class="button--primary">Сохранить изменения</button>
+                <a class="button" href="{% url 'articles:detail' slug=article.slug %}">Отмена</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/article-editor.js' %}"></script>
+{% endblock %}
