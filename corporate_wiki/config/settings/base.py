@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "apps.images",
     "apps.search",
     "apps.audit",
+    "apps.core",
 ]
 
 MIDDLEWARE = [
@@ -86,6 +87,10 @@ DATABASES = {
         "NAME": SQLITE_PATH,
     }
 }
+
+# Where `manage.py backup_database` writes its snapshots (section 25,
+# Этап 11.6). Defaults to a sibling directory of the database file itself.
+BACKUP_DIR = env("BACKUP_DIR", default=str(Path(SQLITE_PATH).parent / "backups"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
