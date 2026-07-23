@@ -167,38 +167,6 @@ def test_rename_redirect_old_slug_reaches_new_article(client):
     assert "Новое имя статьи" in followed.content.decode()
 
 
-def test_preview_endpoint_returns_rendered_html(client):
-    user = UserFactory(must_change_password=False)
-    client.force_login(user)
-
-    response = client.post(reverse("articles:preview"), {"content_source": "**жирный текст**"})
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "<strong>жирный текст</strong>" in data["content_html"]
-
-
-def test_preview_endpoint_sanitizes_script_tags(client):
-    user = UserFactory(must_change_password=False)
-    client.force_login(user)
-
-    response = client.post(
-        reverse("articles:preview"), {"content_source": "<script>alert(1)</script>Безопасно"}
-    )
-
-    data = response.json()
-    assert "<script" not in data["content_html"]
-    assert "Безопасно" in data["content_html"]
-
-
-def test_preview_endpoint_rejects_get(client):
-    user = UserFactory(must_change_password=False)
-    client.force_login(user)
-
-    response = client.get(reverse("articles:preview"))
-    assert response.status_code == 405
-
-
 def test_link_suggestions_lists_active_article_titles(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)
@@ -223,3 +191,14 @@ def test_link_suggestions_excludes_given_slug(client):
 
     titles = {a["title"] for a in response.json()["articles"]}
     assert "CardsPro" not in titles
+
+
+def test_link_suggestions_includes_article_id_for_editor_wikilinks(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = services.create_article(title="CardsPro", content_source="x", created_by=user)
+
+    response = client.get(reverse("articles:link_suggestions"))
+
+    entries = {a["title"]: a["id"] for a in response.json()["articles"]}
+    assert entries["CardsPro"] == str(article.pk)

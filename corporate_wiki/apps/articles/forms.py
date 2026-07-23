@@ -22,7 +22,3 @@ class ArticleEditForm(forms.Form):
     )
     base_revision_id = forms.CharField(widget=forms.HiddenInput)
     article_version = forms.IntegerField(widget=forms.HiddenInput)
-
-
-class ArticlePreviewForm(forms.Form):
-    content_source = forms.CharField(widget=forms.Textarea, required=False)

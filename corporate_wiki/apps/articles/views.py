@@ -9,8 +9,8 @@ from django.views.decorators.http import require_POST
 from apps.articles import selectors, services
 from apps.articles.diffing import build_line_diff
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
-from apps.articles.forms import ArticleCreateForm, ArticleEditForm, ArticlePreviewForm
-from apps.articles.markdown_ext import extract_toc_html, render_article_content
+from apps.articles.forms import ArticleCreateForm, ArticleEditForm
+from apps.articles.markdown_ext import extract_toc_html
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision
 
 
@@ -132,18 +132,10 @@ def article_edit(request, slug: str):
         )
 
     return render(
-        request, "articles/edit.html", {"article": article, "form": form, "conflict": False}
+        request,
+        "articles/edit.html",
+        {"article": article, "form": form, "conflict": False, "revision": revision},
     )
-
-
-@require_POST
-def article_preview(request):
-    form = ArticlePreviewForm(request.POST)
-    if not form.is_valid():
-        return JsonResponse({"content_html": "", "toc_html": ""})
-
-    content_html, toc_html = render_article_content(form.cleaned_data["content_source"])
-    return JsonResponse({"content_html": content_html, "toc_html": toc_html})
 
 
 def article_link_suggestions(request):
@@ -156,9 +148,9 @@ def article_link_suggestions(request):
         Article.objects.filter(is_archived=False)
         .exclude(slug=request.GET.get("exclude", ""))
         .order_by("title")
-        .values("title", "slug")
+        .values("id", "title", "slug")
     )
-    return JsonResponse({"articles": list(articles)})
+    return JsonResponse({"articles": [{**a, "id": str(a["id"])} for a in articles]})
 
 
 def article_history(request, slug: str):

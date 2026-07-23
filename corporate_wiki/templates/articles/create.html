@@ -26,30 +26,24 @@
                 {{ form.edit_summary }}
             </div>
 
-            <div class="editor-layout">
-                <div class="editor-layout__pane">
-                    {{ form.content_source.label_tag }}
-                    {{ form.content_source }}
-                </div>
-                <div class="editor-layout__pane">
-                    <p id="article-preview-label" class="preview-label">Предварительный просмотр</p>
-                    <div
-                        class="content-card content-card--article article-preview"
-                        id="article-preview"
-                        role="region"
-                        aria-labelledby="article-preview-label"
-                        aria-live="polite"
-                    >
-                        <p class="text-secondary">Нажмите «Предпросмотр», чтобы увидеть, как будет выглядеть статья.</p>
-                    </div>
-                </div>
+            <div class="form-row">
+                <label id="article-editor-label">Текст статьи</label>
+                {% include "includes/wysiwyg_toolbar.html" %}
+                <div
+                    class="content-card content-card--article article-body wysiwyg-surface"
+                    id="article-editor-surface"
+                    data-wysiwyg-surface
+                    contenteditable="true"
+                    role="textbox"
+                    aria-multiline="true"
+                    aria-labelledby="article-editor-label"
+                ></div>
+                <div style="display: none;">{{ form.content_source }}</div>
             </div>
 
             {% include "includes/image_insert_panel.html" %}
 
             <div class="form-row">
-                <button type="button" class="button" data-image-upload>Добавить изображение</button>
-                <button type="button" class="button" data-preview-target="article-preview">Предпросмотр</button>
                 <button type="submit" class="button--primary">Опубликовать</button>
                 <a class="button" href="{% url 'home' %}">Отмена</a>
             </div>

@@ -107,6 +107,21 @@ def test_wikilink_to_missing_article_is_red_and_links_to_create():
     assert "/articles/create/?title=" in html
 
 
+def test_wikilink_to_existing_article_carries_data_article_id_for_editor_roundtrip():
+    user = UserFactory()
+    article = services.create_article(
+        title="Отпускные правила", content_source="текст", created_by=user
+    )
+
+    html, _toc = render_article_content("[[Отпускные правила]]")
+    assert f'data-wiki-article-id="{article.pk}"' in html
+
+
+def test_wikilink_to_missing_article_carries_data_title_for_editor_roundtrip():
+    html, _toc = render_article_content("[[Ещё не написана]]")
+    assert 'data-wiki-title="Ещё не написана"' in html
+
+
 def test_wikilink_to_archived_article_has_distinct_indicator():
     user = UserFactory()
     article = services.create_article(title="Архивная", content_source="текст", created_by=user)
@@ -128,6 +143,19 @@ def test_wikilink_by_uuid():
 def test_wikilink_by_invalid_uuid_is_missing():
     html, _toc = render_article_content("[[article:not-a-uuid|text]]")
     assert "wiki-link-missing" in html
+
+
+def test_wikilink_by_uuid_carries_data_article_id_for_editor_roundtrip():
+    user = UserFactory()
+    article = services.create_article(title="По UUID", content_source="текст", created_by=user)
+
+    html, _toc = render_article_content(f"[[article:{article.pk}|ссылка]]")
+    assert f'data-wiki-article-id="{article.pk}"' in html
+
+
+def test_wikilink_by_missing_uuid_carries_data_uuid_for_editor_roundtrip():
+    html, _toc = render_article_content("[[article:00000000-0000-0000-0000-000000000000|text]]")
+    assert 'data-wiki-uuid="00000000-0000-0000-0000-000000000000"' in html
 
 
 def test_extract_toc_html_matches_render_time_toc():
@@ -160,6 +188,7 @@ def test_image_embed_renders_figure_with_src():
 
     html, _toc = render_article_content(f"![[image:{image.pk}]]")
     assert f'src="/images/{image.pk}/"' in html
+    assert f'data-image-id="{image.pk}"' in html
     assert "<figure>" in html
 
 
