@@ -536,6 +536,7 @@ input[type="radio"] {
 }
 
 .button,
+.button:visited,
 button,
 input[type="submit"] {
     display: inline-block;
@@ -550,7 +551,12 @@ input[type="submit"] {
     width: auto;
 }
 
+/* A visited <a class="button ..."> would otherwise pick up a:visited's
+   color (higher specificity than a single class -- element + pseudo-class
+   beats one class) instead of staying white, making primary/danger button
+   text nearly invisible against their own colored background once clicked. */
 .button--primary,
+.button--primary:visited,
 button[type="submit"],
 input[type="submit"] {
     background: var(--button-primary);
@@ -564,6 +570,7 @@ button[type="submit"]:hover {
 }
 
 .button--danger,
+.button--danger:visited,
 button.button--danger[type="submit"] {
     background: var(--link-missing);
     border-color: var(--link-missing);
