@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.articles",
     "apps.images",
+    "apps.attachments",
     "apps.search",
     "apps.audit",
     "apps.core",
@@ -136,6 +137,8 @@ SITE_URL = env("SITE_URL", default="http://localhost:8000")
 MAX_IMAGE_SIZE_MB = env.int("MAX_IMAGE_SIZE_MB", default=10)
 MAX_IMAGE_WIDTH = env.int("MAX_IMAGE_WIDTH", default=8000)
 MAX_IMAGE_HEIGHT = env.int("MAX_IMAGE_HEIGHT", default=8000)
+
+MAX_ATTACHMENT_SIZE_MB = env.int("MAX_ATTACHMENT_SIZE_MB", default=20)
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never
 # logged, never stored anywhere except as a hashed password.

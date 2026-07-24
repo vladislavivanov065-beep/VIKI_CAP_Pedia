@@ -290,6 +290,42 @@ a.link-missing {
     text-decoration: none;
 }
 
+.sidebar-articles__search {
+    width: 100%;
+    max-width: none;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+}
+
+.sidebar-articles__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.sidebar-articles__list li + li {
+    margin-top: 0.1rem;
+}
+
+.sidebar-articles__list a {
+    display: block;
+    padding: 0.3rem 0.25rem;
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-articles__list a:hover {
+    background: var(--border-light);
+    text-decoration: none;
+}
+
 .content-area {
     flex: 1;
     min-width: 0;
@@ -301,6 +337,82 @@ a.link-missing {
 .content-area__inner {
     width: 100%;
     max-width: var(--content-max-width);
+}
+
+/* Right-hand rail (recommended articles, "ask a question", ...) — lives
+   in the space beyond --content-max-width on wide screens. Empty on
+   pages that don't fill content_rail, so :empty keeps it from taking up
+   any space there. */
+.content-area__rail:empty {
+    display: none;
+}
+
+.content-area__rail {
+    flex: 1 1 260px;
+    min-width: 0;
+    max-width: 320px;
+    margin-left: 1.5rem;
+}
+
+/* Below this, sidebar (220px) + padding + the article's own
+   --content-max-width (960px) + rail leaves no comfortable room for the
+   rail alongside the article, so it wraps onto its own row instead of
+   squeezing both narrower. */
+@media (max-width: 1500px) {
+    .content-area {
+        flex-wrap: wrap;
+    }
+
+    .content-area__rail {
+        max-width: none;
+        margin-left: 0;
+        margin-top: 1.5rem;
+        flex-basis: 100%;
+    }
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.rail-block {
+    padding: 1rem 1.25rem;
+}
+
+.rail-block + .rail-block {
+    margin-top: 1.5rem;
+}
+
+.rail-block__title {
+    font-size: 1rem;
+    margin: 0 0 0.75rem;
+}
+
+.rail-block__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.rail-block__list li + li {
+    margin-top: 0.5rem;
+}
+
+.ask-question-form textarea {
+    width: 100%;
+    max-width: none;
+    resize: vertical;
+    margin-bottom: 0.5rem;
+}
+
+.ask-question-form__note {
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
 }
 
 .content-card {
@@ -382,6 +494,17 @@ input[type="submit"] {
 
 .button--primary:hover,
 button[type="submit"]:hover {
+    opacity: 0.92;
+}
+
+.button--danger,
+button.button--danger[type="submit"] {
+    background: var(--link-missing);
+    border-color: var(--link-missing);
+    color: #fff;
+}
+
+.button--danger:hover {
     opacity: 0.92;
 }
 
@@ -511,6 +634,14 @@ a.external-link::after {
     display: inline-block;
     margin-left: 0.2em;
     font-size: 0.85em;
+}
+
+a.attachment-link {
+    color: var(--link-color);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    padding: 0.15rem 0.5rem;
+    display: inline-block;
 }
 
 .article-header {
@@ -931,4 +1062,31 @@ mark.diff-word-added {
     white-space: pre-wrap;
     font-family: ui-monospace, "SF Mono", Consolas, monospace;
     line-height: 1.6;
+}
+
+/* ---------------------------------------------------------------- */
+/* Document import wizard                                            */
+/* ---------------------------------------------------------------- */
+
+.import-review__list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: 1rem;
+}
+
+.import-review__block textarea,
+.import-review__block input[type="text"] {
+    max-width: none;
+}
+
+.import-review__block textarea {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    resize: vertical;
+}
+
+.import-review__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
 }

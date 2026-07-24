@@ -17,11 +17,13 @@
                 {% include "includes/messages.html" %}
                 {% block content %}{% endblock %}
             </div>
+            <aside class="content-area__rail">{% block content_rail %}{% endblock %}</aside>
         </main>
     </div>
     <script src="{% static 'js/nav.js' %}"></script>
     <script src="{% static 'js/search-suggestions.js' %}"></script>
     <script src="{% static 'js/toc-scrollspy.js' %}"></script>
+    <script src="{% static 'js/sidebar-articles.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from apps.accounts.factories import UserFactory
@@ -272,3 +274,58 @@ def test_image_embed_ignores_unknown_options():
 
     html, _toc = render_article_content(f"![[image:{image.pk}|Подпись|align=diagonal]]")
     assert "<figure>" in html
+
+
+def test_attachment_embed_renders_download_link():
+    from io import BytesIO
+
+    from apps.attachments import services
+    from apps.attachments.tests.factories import make_txt_bytes
+
+    user = UserFactory()
+    attachment = services.upload_attachment(
+        file_obj=BytesIO(make_txt_bytes()),
+        original_filename="отчёт.txt",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"[[attachment:{attachment.pk}]]")
+    assert f'href="/attachments/{attachment.pk}/download/"' in html
+    assert f'data-attachment-id="{attachment.pk}"' in html
+    assert 'class="attachment-link"' in html
+    assert "отчёт.txt" in html
+
+
+def test_attachment_embed_with_custom_display_text():
+    from io import BytesIO
+
+    from apps.attachments import services
+    from apps.attachments.tests.factories import make_txt_bytes
+
+    user = UserFactory()
+    attachment = services.upload_attachment(
+        file_obj=BytesIO(make_txt_bytes()),
+        original_filename="отчёт.txt",
+        uploaded_by=user,
+    )
+
+    html, _toc = render_article_content(f"[[attachment:{attachment.pk}|Скачать отчёт]]")
+    assert "Скачать отчёт" in html
+    # The real filename still appears in `download=""`, but the visible
+    # link text is the custom display text, not the filename.
+    anchor_text = re.search(r"<a[^>]*>([^<]*)</a>", html).group(1)
+    assert anchor_text == "\U0001f4ce Скачать отчёт"
+
+
+def test_attachment_embed_missing_shows_placeholder():
+    html, _toc = render_article_content("[[attachment:00000000-0000-0000-0000-000000000000]]")
+    assert "вложение не найдено" in html
+    assert "wiki-link-missing" in html
+
+
+def test_attachment_embed_does_not_collide_with_wikilink_title_syntax():
+    # A literal [[attachment:...]] with a non-UUID target must still be
+    # treated as an attachment reference (and reported missing), not
+    # accidentally parsed as a wikilink titled "attachment:not-a-uuid".
+    html, _toc = render_article_content("[[attachment:not-a-uuid]]")
+    assert "вложение не найдено" in html

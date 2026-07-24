@@ -24,7 +24,8 @@ from markdown.inlinepatterns import InlineProcessor, SimpleTagInlineProcessor
 from markdown.treeprocessors import Treeprocessor
 
 WIKILINK_UUID_RE = r"\[\[article:([^\|\]]+)(?:\|([^\]]+))?\]\]"
-WIKILINK_TITLE_RE = r"\[\[(?!article:)([^\|\]]+)(?:\|([^\]]+))?\]\]"
+WIKILINK_TITLE_RE = r"\[\[(?!article:)(?!attachment:)([^\|\]]+)(?:\|([^\]]+))?\]\]"
+ATTACHMENT_EMBED_RE = r"\[\[attachment:([^\|\]]+)(?:\|([^\]]+))?\]\]"
 # Third segment carries layout options as "key=value;key=value", e.g.
 # ![[image:UUID|Caption|align=left;size=medium]] — see IMAGE_ALIGN_CLASSES/
 # IMAGE_SIZE_CLASSES below for the allowed values.
@@ -104,12 +105,21 @@ SANITIZE_ATTRIBUTES = {
     # WYSIWYG editor's DOM->Markdown serializer can reconstruct the exact
     # source syntax without guessing a title back from a slug — they're
     # inert text for anything else that reads this HTML.
-    "a": {"href", "title", "target", "data-wiki-article-id", "data-wiki-title", "data-wiki-uuid"},
+    "a": {
+        "href",
+        "title",
+        "target",
+        "download",
+        "data-wiki-article-id",
+        "data-wiki-title",
+        "data-wiki-uuid",
+        "data-attachment-id",
+    },
     "img": {"src", "alt", "title", "data-image-id"},
     **{f"h{level}": {"id"} for level in range(1, 7)},
 }
 SANITIZE_CLASSES = {
-    "a": _INTERNAL_LINK_CLASSES | {"external-link"},
+    "a": _INTERNAL_LINK_CLASSES | {"external-link", "attachment-link"},
     "span": {"wiki-link-missing"},
     "figure": set(IMAGE_ALIGN_CLASSES.values()) | set(IMAGE_SIZE_CLASSES.values()),
 }
@@ -210,6 +220,33 @@ class ImageEmbedInlineProcessor(InlineProcessor):
         return figure, m.start(0), m.end(0)
 
 
+class AttachmentEmbedInlineProcessor(InlineProcessor):
+    """``[[attachment:UUID]]`` / ``[[attachment:UUID|Display text]]`` — a
+    downloadable document link (text/Word/PDF attachments, distinct from
+    the image embed syntax above)."""
+
+    def handleMatch(self, m, data):
+        from apps.attachments.models import ArticleAttachment
+
+        raw_uuid = m.group(1).strip()
+        try:
+            attachment = ArticleAttachment.objects.get(pk=raw_uuid)
+        except (ArticleAttachment.DoesNotExist, ValueError, ValidationError):
+            missing = etree.Element("span")
+            missing.text = "[вложение не найдено]"
+            missing.set("class", "wiki-link-missing")
+            return missing, m.start(0), m.end(0)
+
+        display = (m.group(2) or attachment.original_filename or str(attachment.pk)).strip()
+        anchor = etree.Element("a")
+        anchor.text = f"\U0001f4ce {display}"
+        anchor.set("href", f"/attachments/{attachment.pk}/download/")
+        anchor.set("class", "attachment-link")
+        anchor.set("data-attachment-id", str(attachment.pk))
+        anchor.set("download", attachment.original_filename or "")
+        return anchor, m.start(0), m.end(0)
+
+
 class ExternalLinkTreeprocessor(Treeprocessor):
     """Marks plain ``[text](url)`` links to other domains as external."""
 
@@ -235,7 +272,10 @@ class CorporateWikiExtension(Extension):
 
     def extendMarkdown(self, md):
         md.inlinePatterns.register(
-            ImageEmbedInlineProcessor(IMAGE_EMBED_RE, md), "image_embed", 177
+            ImageEmbedInlineProcessor(IMAGE_EMBED_RE, md), "image_embed", 178
+        )
+        md.inlinePatterns.register(
+            AttachmentEmbedInlineProcessor(ATTACHMENT_EMBED_RE, md), "attachment_embed", 177
         )
         md.inlinePatterns.register(
             WikiLinkByUuidInlineProcessor(WIKILINK_UUID_RE, md), "wikilink_uuid", 176

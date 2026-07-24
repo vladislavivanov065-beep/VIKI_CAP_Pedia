@@ -9,6 +9,20 @@
     </div>
     {% if user.is_authenticated %}
         <div class="sidebar__section">
+            <h2 class="sidebar__heading">Все статьи</h2>
+            <input
+                type="search"
+                class="sidebar-articles__search"
+                placeholder="Найти статью..."
+                aria-label="Поиск по названию, описанию и тексту статей"
+                data-sidebar-article-search
+            >
+            <ul class="sidebar-articles__list" data-sidebar-article-list>
+                <li class="text-secondary">Загрузка…</li>
+            </ul>
+        </div>
+
+        <div class="sidebar__section">
             <h2 class="sidebar__heading">Личное</h2>
             <ul class="sidebar__list">
                 <li><a href="{% url 'accounts:security_settings' %}">Безопасность</a></li>
@@ -19,6 +33,7 @@
         <div class="sidebar__section">
             <h2 class="sidebar__heading">Администрирование</h2>
             <ul class="sidebar__list">
+                <li><a href="{% url 'articles:import_upload' %}">Импорт документа</a></li>
                 <li><a href="{% url 'admin:index' %}">Django Admin</a></li>
             </ul>
         </div>
