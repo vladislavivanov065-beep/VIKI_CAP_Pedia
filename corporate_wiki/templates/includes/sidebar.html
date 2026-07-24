@@ -39,6 +39,18 @@
                 <li><a href="{% url 'articles:import_upload' %}">Импорт документа</a></li>
                 <li><a href="{% url 'admin:index' %}">Django Admin</a></li>
             </ul>
+            <form method="post" action="{% url 'assistant:toggle' %}" class="assistant-toggle">
+                {% csrf_token %}
+                <label class="assistant-toggle__label">
+                    <input
+                        type="checkbox"
+                        name="assistant_enabled"
+                        {% if assistant_enabled %}checked{% endif %}
+                        data-assistant-toggle-checkbox
+                    >
+                    Разрешить запросы к ChatGPT
+                </label>
+            </form>
         </div>
     {% endif %}
 </nav>

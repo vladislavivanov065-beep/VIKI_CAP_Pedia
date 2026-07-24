@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.images",
     "apps.attachments",
     "apps.search",
+    "apps.assistant",
     "apps.audit",
     "apps.core",
 ]
@@ -74,6 +75,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "config.context_processors.site_settings",
+                "apps.assistant.context_processors.assistant_settings",
             ],
         },
     },
@@ -145,6 +147,14 @@ MAX_IMAGE_WIDTH = env.int("MAX_IMAGE_WIDTH", default=8000)
 MAX_IMAGE_HEIGHT = env.int("MAX_IMAGE_HEIGHT", default=8000)
 
 MAX_ATTACHMENT_SIZE_MB = env.int("MAX_ATTACHMENT_SIZE_MB", default=20)
+
+# "Задай свой вопрос" (apps.assistant) -- answers a question about the
+# article currently being viewed via OpenAI, called only at the moment a
+# question is actually asked (never on save). Left blank, the feature
+# degrades to a clear "не настроено" message instead of failing hard
+# (see apps.assistant.services.answer_question).
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never
 # logged, never stored anywhere except as a hashed password.

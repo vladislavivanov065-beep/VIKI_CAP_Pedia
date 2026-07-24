@@ -126,7 +126,8 @@ a.link-missing {
     z-index: 100;
 }
 
-.topbar__brand {
+.topbar__brand,
+.topbar__brand:visited {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -476,9 +477,45 @@ a.link-missing {
     margin-bottom: 0.5rem;
 }
 
+.ask-question-form__consent {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: normal;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+
 .ask-question-form__note {
     margin-top: 0.6rem;
     font-size: 0.85rem;
+    color: var(--link-missing);
+}
+
+.assistant-toggle {
+    margin-top: 0.6rem;
+}
+
+.assistant-toggle__label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.ask-question-result {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-light);
+}
+
+.ask-question-result__answer {
+    white-space: pre-wrap;
+    margin: 0;
 }
 
 .content-card {
@@ -1052,7 +1089,8 @@ a.attachment-link {
     margin-bottom: -1px;
 }
 
-.article-tabs__tab {
+.article-tabs__tab,
+.article-tabs__tab:visited {
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-light);
     border-bottom: none;
@@ -1192,7 +1230,8 @@ mark.diff-word-added {
     background: var(--background-page);
 }
 
-.taxonomy-chip--category {
+.taxonomy-chip--category,
+.taxonomy-chip--category:visited {
     border-color: var(--button-primary);
     color: var(--button-primary);
 }

@@ -104,3 +104,9 @@ python manage.py backup_database
 python manage.py rebuild_search_index
 python manage.py rebuild_similarity_cache
 ```
+
+## ИИ-ассистент ("Задай свой вопрос")
+
+Требует `OPENAI_API_KEY` в `.env`. Запрос в OpenAI уходит только в
+момент, когда пользователь реально задал вопрос на странице статьи —
+текст статьи никуда не отправляется при её создании или сохранении.
