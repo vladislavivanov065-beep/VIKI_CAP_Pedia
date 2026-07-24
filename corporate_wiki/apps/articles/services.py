@@ -17,7 +17,7 @@ from django.utils.text import slugify
 from apps.accounts.models import User
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
 from apps.articles.markdown_ext import render_article_content
-from apps.articles.models import Article, ArticleRedirect, ArticleRevision
+from apps.articles.models import Article, ArticleRedirect, ArticleRevision, Category, Tag
 from apps.audit.services import record_event
 
 security_logger = logging.getLogger("security")
@@ -297,4 +297,30 @@ def restore_revision(
         user_agent=user_agent,
         restored_revision=revision_number,
     )
+    return article
+
+
+def _get_or_create_tags(names: list[str]) -> list[Tag]:
+    tags = []
+    for raw_name in names:
+        name = raw_name.strip()
+        slug = slugify(name, allow_unicode=True)
+        if not slug:
+            continue
+        tag, _created = Tag.objects.get_or_create(slug=slug, defaults={"name": name})
+        tags.append(tag)
+    return tags
+
+
+def set_article_taxonomy(
+    *, article_id: uuid.UUID, category_ids: list, tag_names: list[str]
+) -> Article:
+    """Assign an article's categories (existing categories only, picked
+    from the tree) and tags (created on the fly by name if new).
+    """
+    article = Article.objects.get(pk=article_id)
+    categories = list(Category.objects.filter(pk__in=category_ids))
+    tags = _get_or_create_tags(tag_names)
+    article.categories.set(categories)
+    article.tags.set(tags)
     return article

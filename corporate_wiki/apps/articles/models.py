@@ -7,6 +7,47 @@ from django.conf import settings
 from django.db import models
 
 
+class Category(models.Model):
+    """A node in the (optional) category tree articles can be filed
+    under, in the spirit of Wikipedia categories -- a category page
+    lists its direct article members and direct subcategories.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, allow_unicode=True)
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children"
+    )
+
+    class Meta:
+        verbose_name = "категория"
+        verbose_name_plural = "категории"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Tag(models.Model):
+    """A freeform label an article can carry, independent of the
+    category tree -- created on the fly when an author types a new tag
+    name (see ``apps.articles.services.set_article_taxonomy``).
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True, allow_unicode=True)
+
+    class Meta:
+        verbose_name = "тег"
+        verbose_name_plural = "теги"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Article(models.Model):
     """A wiki page. Content itself always lives in ``ArticleRevision`` —
     this row only tracks identity, current pointer and lifecycle state.
@@ -50,6 +91,9 @@ class Article(models.Model):
     # Optimistic-locking counter (section 4.5). Bumped by one on every
     # edit/rename/restore alongside a new ArticleRevision.
     version = models.PositiveIntegerField(default=0)
+
+    categories = models.ManyToManyField(Category, blank=True, related_name="articles")
+    tags = models.ManyToManyField(Tag, blank=True, related_name="articles")
 
     class Meta:
         verbose_name = "статья"
@@ -142,3 +186,36 @@ class ArticleRedirect(models.Model):
 
     def __str__(self) -> str:
         return f"{self.old_slug} → {self.article.slug}"
+
+
+class ArticleSimilarity(models.Model):
+    """A precomputed "recommended articles" entry: ``related_article`` is
+    one of ``article``'s top-N most topically similar other articles.
+
+    Populated by the ``rebuild_similarity_cache`` management command
+    (apps.articles.similarity.compute_all_similarities), not on every
+    page view -- see that module for why. ``apps.articles.similarity.
+    find_similar_articles`` reads this table first and only falls back
+    to computing live for an article that has no cached rows yet.
+    """
+
+    article = models.ForeignKey(
+        Article, on_delete=models.CASCADE, related_name="similarity_entries"
+    )
+    related_article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="+")
+    score = models.FloatField()
+    rank = models.PositiveSmallIntegerField()
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "кэш похожих статей"
+        verbose_name_plural = "кэш похожих статей"
+        ordering = ["article", "rank"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["article", "rank"], name="unique_article_similarity_rank"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.article.title} ~ {self.related_article.title} ({self.score:.3f})"

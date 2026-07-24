@@ -2,7 +2,13 @@ import pytest
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
-from apps.search.services import extract_snippet, search_articles, search_suggestions
+from apps.search.services import (
+    extract_snippet,
+    search_articles,
+    search_suggestions,
+    search_with_snippets,
+    suggest_correction,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -112,3 +118,50 @@ def test_search_content_match_is_case_insensitive_for_cyrillic():
         title="Другое", content_source="Текст содержит СЛОВОСПЕЦИАЛЬНОЕ здесь", created_by=user
     )
     assert article in search_articles("словоспециальное")
+
+
+def test_search_with_snippets_highlights_content_match():
+    user = UserFactory()
+    article_services.create_article(
+        title="Статья",
+        content_source="Порядок оформления ежегодного отпуска для сотрудников.",
+        created_by=user,
+    )
+
+    results = search_with_snippets("отпуска")
+    assert results
+    assert "<mark>" in results[0]["snippet"]
+
+
+def test_search_with_snippets_falls_back_to_plain_snippet_for_title_only_match():
+    user = UserFactory()
+    article_services.create_article(
+        title="Уникальныйзаголовок999", content_source="никак не связанный текст", created_by=user
+    )
+
+    results = search_with_snippets("Уникальныйзаголовок999")
+    assert results
+    assert "<mark>" not in results[0]["snippet"]
+    assert results[0]["snippet"]
+
+
+def test_suggest_correction_fixes_a_typo():
+    user = UserFactory()
+    article_services.create_article(title="Отпускные правила", content_source="x", created_by=user)
+
+    assert suggest_correction("отпустные") == "отпускные"
+
+
+def test_suggest_correction_returns_none_for_exact_match():
+    user = UserFactory()
+    article_services.create_article(title="Отпуск", content_source="x", created_by=user)
+
+    assert suggest_correction("отпуск") is None
+
+
+def test_suggest_correction_returns_none_when_nothing_close():
+    assert suggest_correction("совершеннонеизвестноеслово") is None
+
+
+def test_suggest_correction_returns_none_for_empty_query():
+    assert suggest_correction("") is None

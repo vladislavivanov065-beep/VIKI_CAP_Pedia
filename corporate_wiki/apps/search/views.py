@@ -4,19 +4,23 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
-from apps.search.services import extract_snippet, search_articles, search_suggestions
+from apps.search.services import search_suggestions, search_with_snippets, suggest_correction
 
 
 def search_results(request):
     query = request.GET.get("q", "").strip()
     results = []
+    suggestion = None
     if query:
-        for article in search_articles(query):
-            revision = article.current_revision
-            snippet = extract_snippet(revision.content_source, query) if revision else ""
-            results.append({"article": article, "revision": revision, "snippet": snippet})
+        results = search_with_snippets(query)
+        if not results:
+            suggestion = suggest_correction(query)
 
-    return render(request, "search/results.html", {"query": query, "results": results})
+    return render(
+        request,
+        "search/results.html",
+        {"query": query, "results": results, "suggestion": suggestion},
+    )
 
 
 def search_suggestions_view(request):

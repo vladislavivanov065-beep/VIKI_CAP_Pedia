@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Категории — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Категории</h1>
+        {% if categories %}
+            <ul class="category-tree">
+                {% for category in categories %}
+                    <li>
+                        <a href="{% url 'taxonomy:category_detail' slug=category.slug %}">{{ category.name }}</a>
+                        {% if category.children.all %}
+                            <ul>
+                                {% for child in category.children.all %}
+                                    <li><a href="{% url 'taxonomy:category_detail' slug=child.slug %}">{{ child.name }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">Категорий пока нет.</p>
+        {% endif %}
+    </div>
+{% endblock %}

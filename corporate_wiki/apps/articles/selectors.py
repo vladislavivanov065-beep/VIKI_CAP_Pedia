@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import re
-
 from django.db.models import QuerySet
 
 from apps.accounts.models import User
 from apps.articles.models import Article, ArticleRevision
+from apps.search import fts
 
-_TAG_RE = re.compile(r"<[^>]+>")
-_SIDEBAR_LIST_SCAN_LIMIT = 2000
 _SIDEBAR_LIST_RESULT_LIMIT = 300
 
 
@@ -47,10 +44,10 @@ def get_user_contributions(user: User, *, limit: int | None = None) -> QuerySet[
 def find_articles_for_sidebar_list(query: str = "") -> list[Article]:
     """Backs the sidebar's quick-browse/quick-search widget: all active
     article titles when ``query`` is blank, or every article whose title
-    or content contains *all* the given words (matched in Python, not
-    SQL — SQLite's ``LOWER()``/``LIKE`` only case-fold ASCII, so a
-    Cyrillic-aware substring match has to happen here; see
-    apps/search/services.py for the same constraint).
+    or content matches *all* the given words -- via the FTS5 index
+    (apps/search/fts.py) rather than a per-row Python scan, so this stays
+    fast as the article count grows and is Cyrillic-case-insensitive at
+    the DB level.
     """
     base_qs = (
         Article.objects.filter(is_archived=False)
@@ -62,17 +59,10 @@ def find_articles_for_sidebar_list(query: str = "") -> list[Article]:
     if not query:
         return list(base_qs[:_SIDEBAR_LIST_RESULT_LIMIT])
 
-    words = [word for word in query.lower().split() if word]
-    if not words:
-        return list(base_qs[:_SIDEBAR_LIST_RESULT_LIMIT])
+    hits = fts.search(query, limit=_SIDEBAR_LIST_RESULT_LIMIT)
+    if not hits:
+        return []
 
-    matched: list[Article] = []
-    for article in base_qs[:_SIDEBAR_LIST_SCAN_LIMIT]:
-        haystack = article.title.lower()
-        if article.current_revision:
-            haystack += " " + _TAG_RE.sub(" ", article.current_revision.content_html or "").lower()
-        if all(word in haystack for word in words):
-            matched.append(article)
-            if len(matched) >= _SIDEBAR_LIST_RESULT_LIMIT:
-                break
-    return matched
+    ids = [hit.article_id for hit in hits]
+    fetched_by_id = {str(a.pk): a for a in base_qs.filter(pk__in=ids)}
+    return [fetched_by_id[article_id] for article_id in ids if article_id in fetched_by_id]

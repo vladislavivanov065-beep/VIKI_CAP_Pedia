@@ -13,7 +13,7 @@ from apps.articles.document_import import parse_uploaded_document
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
 from apps.articles.forms import ArticleCreateForm, ArticleEditForm, DocumentImportUploadForm
 from apps.articles.markdown_ext import extract_toc_html
-from apps.articles.models import Article, ArticleRedirect, ArticleRevision
+from apps.articles.models import Article, ArticleRedirect, ArticleRevision, Category, Tag
 from apps.articles.similarity import find_similar_articles
 from apps.attachments.exceptions import InvalidAttachmentError
 
@@ -35,6 +35,11 @@ def article_create(request):
             except ArticleTitleConflict as exc:
                 form.add_error("title", str(exc))
             else:
+                services.set_article_taxonomy(
+                    article_id=article.pk,
+                    category_ids=[c.pk for c in form.cleaned_data["categories"]],
+                    tag_names=form.cleaned_data["tags"],
+                )
                 messages.success(request, "Статья создана.")
                 return redirect("articles:detail", slug=article.slug)
     else:
@@ -126,6 +131,11 @@ def article_edit(request, slug: str):
                     },
                 )
             else:
+                services.set_article_taxonomy(
+                    article_id=article.pk,
+                    category_ids=[c.pk for c in form.cleaned_data["categories"]],
+                    tag_names=form.cleaned_data["tags"],
+                )
                 messages.success(request, "Изменения сохранены.")
                 return redirect("articles:detail", slug=article.slug)
     else:
@@ -134,6 +144,8 @@ def article_edit(request, slug: str):
                 "content_source": revision.content_source if revision else "",
                 "base_revision_id": article.current_revision_id,
                 "article_version": article.version,
+                "categories": article.categories.all(),
+                "tags": ", ".join(tag.name for tag in article.tags.all()),
             }
         )
 
@@ -400,3 +412,27 @@ def document_import_process_block(request, block_id: str):
             return redirect("articles:import_review")
 
     raise Http404("Неизвестное действие.")
+
+
+def category_list(request):
+    top_level = (
+        Category.objects.filter(parent__isnull=True).prefetch_related("children").order_by("name")
+    )
+    return render(request, "articles/category_list.html", {"categories": top_level})
+
+
+def category_detail(request, slug: str):
+    category = get_object_or_404(Category, slug=slug)
+    articles = category.articles.filter(is_archived=False).order_by("title")
+    subcategories = category.children.order_by("name")
+    return render(
+        request,
+        "articles/category_detail.html",
+        {"category": category, "articles": articles, "subcategories": subcategories},
+    )
+
+
+def tag_detail(request, slug: str):
+    tag = get_object_or_404(Tag, slug=slug)
+    articles = tag.articles.filter(is_archived=False).order_by("title")
+    return render(request, "articles/tag_detail.html", {"tag": tag, "articles": articles})

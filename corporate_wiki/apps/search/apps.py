@@ -6,3 +6,6 @@ class SearchConfig(AppConfig):
     name = "apps.search"
     label = "search"
     verbose_name = "Поиск"
+
+    def ready(self):
+        from apps.search import signals  # noqa: F401

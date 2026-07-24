@@ -5,6 +5,7 @@
             <li><a href="{% url 'home' %}">Главная страница</a></li>
             <li><a href="{% url 'search:search' %}">Поиск по статьям</a></li>
             <li><a href="{% url 'articles:create' %}">Создать статью</a></li>
+            <li><a href="{% url 'taxonomy:category_list' %}">Категории</a></li>
         </ul>
     </div>
     {% if user.is_authenticated %}
@@ -18,7 +19,9 @@
                 data-sidebar-article-search
             >
             <ul class="sidebar-articles__list" data-sidebar-article-list>
-                <li class="text-secondary">Загрузка…</li>
+                <li aria-hidden="true"><span class="skeleton-line"></span></li>
+                <li aria-hidden="true"><span class="skeleton-line skeleton-line--short"></span></li>
+                <li aria-hidden="true"><span class="skeleton-line"></span></li>
             </ul>
         </div>
 

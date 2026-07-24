@@ -74,3 +74,14 @@ DJANGO_SETTINGS_MODULE=config.settings.production gunicorn config.wsgi:applicati
 ```bash
 python manage.py backup_database
 ```
+
+## Поиск и рекомендации
+
+Выполняются автоматически при старте контейнера (Docker); вручную или по
+расписанию (например, через cron) — при запуске без Docker или для
+пересборки после массового импорта статей.
+
+```bash
+python manage.py rebuild_search_index
+python manage.py rebuild_similarity_cache
+```

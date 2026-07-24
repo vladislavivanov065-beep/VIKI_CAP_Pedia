@@ -4,6 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
+    <script>
+        (function () {
+            var saved = localStorage.getItem("theme");
+            if (saved === "dark" || saved === "light") {
+                document.documentElement.dataset.theme = saved;
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
@@ -24,6 +32,7 @@
     <script src="{% static 'js/search-suggestions.js' %}"></script>
     <script src="{% static 'js/toc-scrollspy.js' %}"></script>
     <script src="{% static 'js/sidebar-articles.js' %}"></script>
+    <script src="{% static 'js/theme-toggle.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
