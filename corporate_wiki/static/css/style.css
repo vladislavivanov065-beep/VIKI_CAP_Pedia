@@ -21,6 +21,43 @@
     --font-ui: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
+/* Dark theme: follows the OS preference by default, overridable per-visitor
+   via the topbar toggle (static/js/theme-toggle.js), which stamps
+   data-theme on <html> and persists the choice in localStorage. The
+   explicit [data-theme="dark"] rule (outside the media query) covers "dark
+   forced on a light system"; :not([data-theme="light"]) inside the media
+   query covers "light forced on a dark system" -- together they let an
+   explicit choice always win over the OS preference in either direction. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --background-page: #101418;
+        --background-content: #1b1f24;
+        --text-primary: #e8e6e3;
+        --text-secondary: #a2a9b1;
+        --border-color: #3a4048;
+        --border-light: #2a2f36;
+        --link-color: #6699ff;
+        --link-visited: #b490e8;
+        --link-missing: #ff6b6b;
+        --button-background: #22272e;
+        --button-primary: #4d7dff;
+    }
+}
+
+:root[data-theme="dark"] {
+    --background-page: #101418;
+    --background-content: #1b1f24;
+    --text-primary: #e8e6e3;
+    --text-secondary: #a2a9b1;
+    --border-color: #3a4048;
+    --border-light: #2a2f36;
+    --link-color: #6699ff;
+    --link-visited: #b490e8;
+    --link-missing: #ff6b6b;
+    --button-background: #22272e;
+    --button-primary: #4d7dff;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -172,6 +209,20 @@ a.link-missing {
     font-weight: 700;
 }
 
+.search-results__item mark {
+    background: #fff2a8;
+    color: inherit;
+    padding: 0 0.1em;
+    border-radius: 2px;
+}
+
+.search-suggestion {
+    background: var(--border-light);
+    border-radius: 4px;
+    padding: 0.6rem 0.9rem;
+    display: inline-block;
+}
+
 .topbar__spacer {
     flex: 1;
 }
@@ -184,6 +235,21 @@ a.link-missing {
     padding: 0.3rem 0.6rem;
     font-size: 1.1rem;
     cursor: pointer;
+}
+
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+    background: var(--border-light);
 }
 
 .user-menu {
@@ -1089,4 +1155,96 @@ mark.diff-word-added {
     display: flex;
     flex-wrap: wrap;
     gap: 0.6rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* Categories and tags                                               */
+/* ---------------------------------------------------------------- */
+
+.taxonomy-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0;
+}
+
+.taxonomy-chip {
+    display: inline-block;
+    font-size: 0.85rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--background-page);
+}
+
+.taxonomy-chip--category {
+    border-color: var(--button-primary);
+    color: var(--button-primary);
+}
+
+.category-tree,
+.category-tree ul {
+    list-style: none;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+}
+
+.category-tree > li {
+    padding-left: 0;
+}
+
+/* ---------------------------------------------------------------- */
+/* Breadcrumbs                                                       */
+/* ---------------------------------------------------------------- */
+
+.breadcrumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.breadcrumbs span[aria-hidden] {
+    color: var(--border-color);
+}
+
+/* ---------------------------------------------------------------- */
+/* Skeleton loaders                                                  */
+/* ---------------------------------------------------------------- */
+
+.skeleton-line {
+    display: block;
+    height: 0.9em;
+    border-radius: 3px;
+    margin: 0.3rem 0;
+    background: linear-gradient(
+        90deg,
+        var(--border-light) 25%,
+        var(--border-color) 50%,
+        var(--border-light) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-line--short {
+    width: 60%;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-line {
+        animation: none;
+    }
 }

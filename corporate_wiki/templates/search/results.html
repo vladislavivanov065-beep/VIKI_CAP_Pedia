@@ -23,11 +23,17 @@
             <p class="text-secondary">
                 {% if results %}Найдено статей: {{ results|length }}{% else %}Ничего не найдено по запросу «{{ query }}».{% endif %}
             </p>
+            {% if suggestion %}
+                <p class="search-suggestion">
+                    Возможно, вы искали:
+                    <a href="{% url 'search:search' %}?q={{ suggestion|urlencode }}">{{ suggestion }}</a>
+                </p>
+            {% endif %}
             <ul class="search-results">
                 {% for item in results %}
                     <li class="search-results__item">
                         <a href="{% url 'articles:detail' slug=item.article.slug %}">{{ item.article.title }}</a>
-                        <p class="text-secondary">{{ item.snippet }}</p>
+                        <p class="text-secondary">{{ item.snippet|safe }}</p>
                         <p class="text-secondary">
                             Изменено {{ item.article.updated_at|date:"d.m.Y H:i" }}
                             {% if item.revision %}автор — {{ item.revision.edited_by.display_name }}{% endif %}

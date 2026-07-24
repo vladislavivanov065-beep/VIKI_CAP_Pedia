@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Категория: {{ category.name }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <nav class="breadcrumbs" aria-label="Хлебные крошки">
+            <a href="{% url 'home' %}">Главная</a>
+            <span aria-hidden="true">›</span>
+            <a href="{% url 'taxonomy:category_list' %}">Категории</a>
+            <span aria-hidden="true">›</span>
+            <span>{{ category.name }}</span>
+        </nav>
+        <h1>Категория: {{ category.name }}</h1>
+
+        {% if subcategories %}
+            <h2>Подкатегории</h2>
+            <ul class="category-tree">
+                {% for child in subcategories %}
+                    <li><a href="{% url 'taxonomy:category_detail' slug=child.slug %}">{{ child.name }}</a></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <h2>Статьи в категории</h2>
+        {% if articles %}
+            <ul class="search-results">
+                {% for article in articles %}
+                    <li class="search-results__item">
+                        <a href="{% url 'articles:detail' slug=article.slug %}">{{ article.title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">В этой категории пока нет статей.</p>
+        {% endif %}
+    </div>
+{% endblock %}

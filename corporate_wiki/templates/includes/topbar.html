@@ -20,6 +20,7 @@
         <ul class="search-suggestions" data-suggestions-list hidden></ul>
     </form>
     <div class="topbar__spacer"></div>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Переключить тему">🌓</button>
     {% if user.is_authenticated %}
         <details class="user-menu">
             <summary>{{ user.display_name }}</summary>

@@ -1,8 +1,10 @@
 import pytest
+from django.core.management import call_command
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services
-from apps.articles.similarity import find_similar_articles
+from apps.articles.models import ArticleSimilarity
+from apps.articles.similarity import compute_all_similarities, find_similar_articles
 
 pytestmark = pytest.mark.django_db
 
@@ -86,3 +88,74 @@ def test_respects_limit():
     results = find_similar_articles(target, limit=3)
 
     assert len(results) <= 3
+
+
+def test_find_similar_articles_prefers_cache_over_live_computation():
+    user = UserFactory()
+    target = services.create_article(title="Карты", content_source="выпуск карт", created_by=user)
+    close = services.create_article(
+        title="Про карты подробно", content_source="выпуск карт клиентам", created_by=user
+    )
+    far = services.create_article(title="Кошки", content_source="мяу мяу мяу", created_by=user)
+
+    # A deliberately "wrong" cache entry (far is not actually similar) --
+    # if find_similar_articles reads this instead of recomputing live, it
+    # proves the cache is actually consulted rather than always falling
+    # back.
+    ArticleSimilarity.objects.create(article=target, related_article=far, score=0.9, rank=1)
+
+    results = find_similar_articles(target, limit=3)
+
+    assert results == [far]
+    assert close not in results
+
+
+def test_compute_all_similarities_ranks_topically_close_articles_higher():
+    user = UserFactory()
+    a = services.create_article(
+        title="Выпуск карт CardsPro",
+        content_source="выпуск карт клиентам CardsPro",
+        created_by=user,
+    )
+    b = services.create_article(
+        title="Перевыпуск карт", content_source="перевыпуск карт клиентам CardsPro", created_by=user
+    )
+    c = services.create_article(title="Отпуска", content_source="правила отпусков", created_by=user)
+
+    results = compute_all_similarities(limit=3)
+
+    related_to_a = [related_id for related_id, _score in results[str(a.pk)]]
+    assert str(b.pk) in related_to_a
+    assert str(c.pk) not in related_to_a
+
+
+def test_rebuild_similarity_cache_command_populates_cache_table():
+    user = UserFactory()
+    a = services.create_article(
+        title="Выпуск карт CardsPro",
+        content_source="выпуск карт клиентам CardsPro",
+        created_by=user,
+    )
+    services.create_article(
+        title="Перевыпуск карт", content_source="перевыпуск карт клиентам CardsPro", created_by=user
+    )
+
+    call_command("rebuild_similarity_cache")
+
+    assert ArticleSimilarity.objects.filter(article=a).exists()
+
+
+def test_rebuild_similarity_cache_command_is_idempotent():
+    user = UserFactory()
+    services.create_article(title="Карты", content_source="выпуск карт", created_by=user)
+    services.create_article(
+        title="Про карты подробно", content_source="выпуск карт клиентам", created_by=user
+    )
+
+    call_command("rebuild_similarity_cache")
+    first_count = ArticleSimilarity.objects.count()
+    call_command("rebuild_similarity_cache")
+    second_count = ArticleSimilarity.objects.count()
+
+    assert first_count == second_count
+    assert first_count > 0

@@ -4,6 +4,12 @@
 {% block title %}{{ article.title }} — {{ site_name }}{% endblock %}
 
 {% block content %}
+    <nav class="breadcrumbs" aria-label="Хлебные крошки">
+        <a href="{% url 'home' %}">Главная</a>
+        <span aria-hidden="true">›</span>
+        <span>{{ article.title }}</span>
+    </nav>
+
     {% if article.is_archived %}
         <div class="messages">
             <p style="padding: 0.6rem 0.9rem; border-radius: 4px; background: #fde7e9; border: 1px solid #ba0000;">
@@ -42,6 +48,17 @@
             Последнее изменение: {{ article.updated_at|date:"d.m.Y H:i" }}
             {% if revision %}автор — {{ revision.edited_by.display_name }}{% endif %}
         </p>
+
+        {% if article.categories.all or article.tags.all %}
+            <p class="taxonomy-chips">
+                {% for category in article.categories.all %}
+                    <a class="taxonomy-chip taxonomy-chip--category" href="{% url 'taxonomy:category_detail' slug=category.slug %}">{{ category.name }}</a>
+                {% endfor %}
+                {% for tag in article.tags.all %}
+                    <a class="taxonomy-chip taxonomy-chip--tag" href="{% url 'taxonomy:tag_detail' slug=tag.slug %}">#{{ tag.name }}</a>
+                {% endfor %}
+            </p>
+        {% endif %}
 
         {% if show_source %}
             <pre class="article-source">{{ revision.content_source }}</pre>

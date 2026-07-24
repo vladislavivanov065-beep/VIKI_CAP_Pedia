@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Тег: {{ tag.name }} — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <nav class="breadcrumbs" aria-label="Хлебные крошки">
+            <a href="{% url 'home' %}">Главная</a>
+            <span aria-hidden="true">›</span>
+            <span>Тег: {{ tag.name }}</span>
+        </nav>
+        <h1>Тег: #{{ tag.name }}</h1>
+
+        {% if articles %}
+            <ul class="search-results">
+                {% for article in articles %}
+                    <li class="search-results__item">
+                        <a href="{% url 'articles:detail' slug=article.slug %}">{{ article.title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">Статей с этим тегом пока нет.</p>
+        {% endif %}
+    </div>
+{% endblock %}
