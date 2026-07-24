@@ -33,9 +33,12 @@
         <div class="article-header">
             <h1>{{ article.title }}</h1>
             <div class="article-actions">
-                <a class="button button--primary" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
+                {% if show_source %}
+                    <a class="button button--primary" href="{% url 'articles:detail' slug=article.slug %}">Читать</a>
+                {% else %}
+                    <a class="button" href="{% url 'articles:detail' slug=article.slug %}?view=source">Посмотреть код</a>
+                {% endif %}
                 <a class="button" href="{% url 'articles:edit' slug=article.slug %}">Редактировать</a>
-                <a class="button" href="{% url 'articles:detail' slug=article.slug %}?view=source">Посмотреть код</a>
                 {% if user.is_staff and not article.is_archived %}
                     <form method="post" action="{% url 'articles:archive' slug=article.slug %}" style="display: inline;">
                         {% csrf_token %}
