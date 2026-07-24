@@ -4,17 +4,20 @@ import pytest
 from django.urls import reverse
 
 from apps.accounts.factories import UserFactory
+from apps.articles import services as article_services
 from apps.assistant.services import AnswerResult
 
 pytestmark = pytest.mark.django_db
 
 
-def test_ask_requires_authentication(client):
-    response = client.post(
-        reverse("assistant:ask"),
-        data=json.dumps({"question": "вопрос"}),
-        content_type="application/json",
+def _ask(client, **payload):
+    return client.post(
+        reverse("assistant:ask"), data=json.dumps(payload), content_type="application/json"
     )
+
+
+def test_ask_requires_authentication(client):
+    response = _ask(client, question="вопрос", article_slug="test")
     assert response.status_code == 302
 
 
@@ -30,11 +33,16 @@ def test_ask_rejects_empty_question(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)
 
-    response = client.post(
-        reverse("assistant:ask"),
-        data=json.dumps({"question": "  "}),
-        content_type="application/json",
-    )
+    response = _ask(client, question="  ", article_slug="test")
+    assert response.status_code == 400
+    assert "error" in response.json()
+
+
+def test_ask_rejects_missing_article_slug(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+
+    response = _ask(client, question="вопрос")
     assert response.status_code == 400
     assert "error" in response.json()
 
@@ -49,26 +57,42 @@ def test_ask_rejects_malformed_json(client):
     assert response.status_code == 400
 
 
-def test_ask_returns_answer_and_sources(client, monkeypatch):
+def test_ask_404s_for_unknown_article(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)
 
-    fake_article = type("FakeArticle", (), {"title": "Отпуска", "slug": "otpuska"})()
+    response = _ask(client, question="вопрос", article_slug="no-such-article")
+    assert response.status_code == 404
+
+
+def test_ask_404s_for_archived_article(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
+    article_services.archive_article(article_id=article.pk, actor=user)
+
+    response = _ask(client, question="вопрос", article_slug=article.slug)
+    assert response.status_code == 404
+
+
+def test_ask_returns_answer(client, monkeypatch):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Отпуска", content_source="текст", created_by=user
+    )
+
     monkeypatch.setattr(
         "apps.assistant.views.services.answer_question",
-        lambda question: AnswerResult(answer="Ответ на вопрос.", sources=[fake_article]),
+        lambda article, question: AnswerResult(answer="Ответ на вопрос."),
     )
 
-    response = client.post(
-        reverse("assistant:ask"),
-        data=json.dumps({"question": "Как оформить отпуск?"}),
-        content_type="application/json",
-    )
+    response = _ask(client, question="Как оформить отпуск?", article_slug=article.slug)
 
     assert response.status_code == 200
-    data = response.json()
-    assert data["answer"] == "Ответ на вопрос."
-    assert data["sources"] == [{"title": "Отпуска", "slug": "otpuska"}]
+    assert response.json() == {"answer": "Ответ на вопрос."}
 
 
 def test_ask_reports_not_configured_as_service_unavailable(client, monkeypatch):
@@ -76,17 +100,16 @@ def test_ask_reports_not_configured_as_service_unavailable(client, monkeypatch):
 
     user = UserFactory(must_change_password=False)
     client.force_login(user)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
 
-    def _raise(question):
+    def _raise(article, question):
         raise AssistantNotConfiguredError("не настроено")
 
     monkeypatch.setattr("apps.assistant.views.services.answer_question", _raise)
 
-    response = client.post(
-        reverse("assistant:ask"),
-        data=json.dumps({"question": "вопрос"}),
-        content_type="application/json",
-    )
+    response = _ask(client, question="вопрос", article_slug=article.slug)
 
     assert response.status_code == 503
     assert "error" in response.json()
@@ -97,17 +120,16 @@ def test_ask_reports_request_error_as_bad_gateway(client, monkeypatch):
 
     user = UserFactory(must_change_password=False)
     client.force_login(user)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
 
-    def _raise(question):
+    def _raise(article, question):
         raise AssistantRequestError("сбой сети")
 
     monkeypatch.setattr("apps.assistant.views.services.answer_question", _raise)
 
-    response = client.post(
-        reverse("assistant:ask"),
-        data=json.dumps({"question": "вопрос"}),
-        content_type="application/json",
-    )
+    response = _ask(client, question="вопрос", article_slug=article.slug)
 
     assert response.status_code == 502
     assert "error" in response.json()

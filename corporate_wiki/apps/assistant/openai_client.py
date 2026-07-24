@@ -1,7 +1,7 @@
 """Thin wrapper around the OpenAI SDK.
 
-Isolated in its own module for two reasons: tests monkeypatch these two
-functions instead of mocking the SDK client directly, and nothing else in
+Isolated in its own module for two reasons: tests monkeypatch this
+function instead of mocking the SDK client directly, and nothing else in
 the app needs to import ``openai`` or know how the client is constructed.
 """
 
@@ -18,16 +18,6 @@ def _client():
     from openai import OpenAI
 
     return OpenAI(api_key=settings.OPENAI_API_KEY)
-
-
-def create_embedding(text: str) -> list[float]:
-    try:
-        response = _client().embeddings.create(model=settings.OPENAI_EMBEDDING_MODEL, input=text)
-    except AssistantNotConfiguredError:
-        raise
-    except Exception as exc:
-        raise AssistantRequestError(f"Не удалось получить embedding: {exc}") from exc
-    return list(response.data[0].embedding)
 
 
 def create_chat_completion(*, system_prompt: str, user_prompt: str) -> str:

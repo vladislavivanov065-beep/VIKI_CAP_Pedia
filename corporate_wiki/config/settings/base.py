@@ -147,13 +147,13 @@ MAX_IMAGE_HEIGHT = env.int("MAX_IMAGE_HEIGHT", default=8000)
 
 MAX_ATTACHMENT_SIZE_MB = env.int("MAX_ATTACHMENT_SIZE_MB", default=20)
 
-# "Задай свой вопрос" (apps.assistant) -- answers questions from article
-# text via OpenAI. Left blank, the feature degrades to a clear "не
-# настроено" message instead of failing hard (see
-# apps.assistant.services.answer_question).
+# "Задай свой вопрос" (apps.assistant) -- answers a question about the
+# article currently being viewed via OpenAI, called only at the moment a
+# question is actually asked (never on save). Left blank, the feature
+# degrades to a clear "не настроено" message instead of failing hard
+# (see apps.assistant.services.answer_question).
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
-OPENAI_EMBEDDING_MODEL = env("OPENAI_EMBEDDING_MODEL", default="text-embedding-3-small")
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never
 # logged, never stored anywhere except as a hashed password.
