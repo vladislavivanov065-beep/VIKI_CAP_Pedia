@@ -725,6 +725,11 @@ a.attachment-link {
 
 .article-body {
     margin-top: 1rem;
+    /* Left/right-aligned images inside are floated (see wiki-image--align-*
+       below); without this, a float as the last thing in the article isn't
+       counted in this element's height and visually spills out past the
+       card's bottom edge instead of being contained by it. */
+    display: flow-root;
 }
 
 .article-body table {
@@ -912,6 +917,9 @@ a.attachment-link {
     min-height: 420px;
     outline: none;
     cursor: text;
+    /* Same float-containment fix as .article-body -- the editor uses the
+       same wiki-image--align-left/right classes while composing. */
+    display: flow-root;
 }
 
 .wysiwyg-surface:focus {
