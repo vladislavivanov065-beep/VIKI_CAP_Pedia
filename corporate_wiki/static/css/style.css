@@ -126,7 +126,8 @@ a.link-missing {
     z-index: 100;
 }
 
-.topbar__brand {
+.topbar__brand,
+.topbar__brand:visited {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1052,7 +1053,8 @@ a.attachment-link {
     margin-bottom: -1px;
 }
 
-.article-tabs__tab {
+.article-tabs__tab,
+.article-tabs__tab:visited {
     padding: 0.5rem 1rem;
     border: 1px solid var(--border-light);
     border-bottom: none;
@@ -1192,7 +1194,8 @@ mark.diff-word-added {
     background: var(--background-page);
 }
 
-.taxonomy-chip--category {
+.taxonomy-chip--category,
+.taxonomy-chip--category:visited {
     border-color: var(--button-primary);
     color: var(--button-primary);
 }
