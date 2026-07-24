@@ -300,27 +300,34 @@ def restore_revision(
     return article
 
 
-def _get_or_create_tags(names: list[str]) -> list[Tag]:
-    tags = []
+def _get_or_create_by_name(model, names: list[str]):
+    """Shared get-or-create-by-name for Category and Tag: both dedupe on
+    an ``allow_unicode`` slug (Cyrillic-safe, since it's a plain equality
+    lookup on an already-lowercased value rather than a SQL LOWER()/LIKE
+    comparison) so typing "Отпуска" and later "отпуска" reuses one row.
+    """
+    instances = []
     for raw_name in names:
         name = raw_name.strip()
         slug = slugify(name, allow_unicode=True)
         if not slug:
             continue
-        tag, _created = Tag.objects.get_or_create(slug=slug, defaults={"name": name})
-        tags.append(tag)
-    return tags
+        instance, _created = model.objects.get_or_create(slug=slug, defaults={"name": name})
+        instances.append(instance)
+    return instances
 
 
 def set_article_taxonomy(
-    *, article_id: uuid.UUID, category_ids: list, tag_names: list[str]
+    *, article_id: uuid.UUID, category_names: list[str], tag_names: list[str]
 ) -> Article:
-    """Assign an article's categories (existing categories only, picked
-    from the tree) and tags (created on the fly by name if new).
+    """Assign an article's categories and tags, creating either on the
+    fly by name if new (a category created this way has no parent --
+    building out the tree is an admin task done separately in Django
+    Admin).
     """
     article = Article.objects.get(pk=article_id)
-    categories = list(Category.objects.filter(pk__in=category_ids))
-    tags = _get_or_create_tags(tag_names)
+    categories = _get_or_create_by_name(Category, category_names)
+    tags = _get_or_create_by_name(Tag, tag_names)
     article.categories.set(categories)
     article.tags.set(tags)
     return article

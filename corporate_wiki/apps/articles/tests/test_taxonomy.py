@@ -8,18 +8,28 @@ from apps.articles.models import Category, Tag
 pytestmark = pytest.mark.django_db
 
 
-def test_set_article_taxonomy_assigns_categories_and_creates_tags():
+def test_set_article_taxonomy_creates_categories_and_tags_on_the_fly():
     user = UserFactory()
     article = services.create_article(title="Статья", content_source="x", created_by=user)
-    category = Category.objects.create(name="HR", slug="hr")
 
     services.set_article_taxonomy(
-        article_id=article.pk, category_ids=[category.pk], tag_names=["отпуска", "правила"]
+        article_id=article.pk, category_names=["HR"], tag_names=["отпуска", "правила"]
     )
 
     article.refresh_from_db()
-    assert list(article.categories.all()) == [category]
+    assert list(article.categories.values_list("name", flat=True)) == ["HR"]
     assert {t.name for t in article.tags.all()} == {"отпуска", "правила"}
+
+
+def test_set_article_taxonomy_reuses_existing_category_across_case_variants():
+    user = UserFactory()
+    article_a = services.create_article(title="Статья A", content_source="x", created_by=user)
+    article_b = services.create_article(title="Статья B", content_source="x", created_by=user)
+
+    services.set_article_taxonomy(article_id=article_a.pk, category_names=["Отпуска"], tag_names=[])
+    services.set_article_taxonomy(article_id=article_b.pk, category_names=["ОТПУСКА"], tag_names=[])
+
+    assert Category.objects.count() == 1
 
 
 def test_set_article_taxonomy_reuses_existing_tag_across_case_variants():
@@ -27,37 +37,47 @@ def test_set_article_taxonomy_reuses_existing_tag_across_case_variants():
     article_a = services.create_article(title="Статья A", content_source="x", created_by=user)
     article_b = services.create_article(title="Статья B", content_source="x", created_by=user)
 
-    services.set_article_taxonomy(article_id=article_a.pk, category_ids=[], tag_names=["Отпуска"])
-    services.set_article_taxonomy(article_id=article_b.pk, category_ids=[], tag_names=["ОТПУСКА"])
+    services.set_article_taxonomy(article_id=article_a.pk, category_names=[], tag_names=["Отпуска"])
+    services.set_article_taxonomy(article_id=article_b.pk, category_names=[], tag_names=["ОТПУСКА"])
 
     assert Tag.objects.count() == 1
 
 
-def test_set_article_taxonomy_ignores_blank_tag_names():
+def test_set_article_taxonomy_ignores_blank_names():
     user = UserFactory()
     article = services.create_article(title="Статья", content_source="x", created_by=user)
 
     services.set_article_taxonomy(
-        article_id=article.pk, category_ids=[], tag_names=["  ", "", "реальный"]
+        article_id=article.pk, category_names=["  ", ""], tag_names=["  ", "", "реальный"]
     )
 
+    assert article.categories.count() == 0
     assert list(article.tags.values_list("name", flat=True)) == ["реальный"]
 
 
 def test_set_article_taxonomy_replaces_previous_assignment():
     user = UserFactory()
     article = services.create_article(title="Статья", content_source="x", created_by=user)
-    services.set_article_taxonomy(article_id=article.pk, category_ids=[], tag_names=["старый"])
+    services.set_article_taxonomy(article_id=article.pk, category_names=[], tag_names=["старый"])
 
-    services.set_article_taxonomy(article_id=article.pk, category_ids=[], tag_names=["новый"])
+    services.set_article_taxonomy(article_id=article.pk, category_names=[], tag_names=["новый"])
 
     assert list(article.tags.values_list("name", flat=True)) == ["новый"]
 
 
-def test_create_article_view_assigns_categories_and_tags(client):
+def test_set_article_taxonomy_created_category_has_no_parent():
+    user = UserFactory()
+    article = services.create_article(title="Статья", content_source="x", created_by=user)
+
+    services.set_article_taxonomy(article_id=article.pk, category_names=["HR"], tag_names=[])
+
+    category = article.categories.get()
+    assert category.parent is None
+
+
+def test_create_article_view_creates_category_and_tags_on_the_fly(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)
-    category = Category.objects.create(name="HR", slug="hr")
 
     client.post(
         reverse("articles:create"),
@@ -65,7 +85,7 @@ def test_create_article_view_assigns_categories_and_tags(client):
             "title": "Новая статья",
             "content_source": "текст",
             "edit_summary": "",
-            "categories": [str(category.pk)],
+            "categories": "HR, Договоры",
             "tags": "отпуска, правила",
         },
     )
@@ -73,7 +93,7 @@ def test_create_article_view_assigns_categories_and_tags(client):
     from apps.articles.models import Article
 
     article = Article.objects.get(title="Новая статья")
-    assert list(article.categories.all()) == [category]
+    assert {c.name for c in article.categories.all()} == {"HR", "Договоры"}
     assert {t.name for t in article.tags.all()} == {"отпуска", "правила"}
 
 
@@ -81,7 +101,7 @@ def test_edit_article_view_updates_tags(client):
     user = UserFactory(must_change_password=False)
     client.force_login(user)
     article = services.create_article(title="Статья", content_source="v1", created_by=user)
-    services.set_article_taxonomy(article_id=article.pk, category_ids=[], tag_names=["старый"])
+    services.set_article_taxonomy(article_id=article.pk, category_names=[], tag_names=["старый"])
 
     client.post(
         reverse("articles:edit", kwargs={"slug": article.slug}),
@@ -90,13 +110,27 @@ def test_edit_article_view_updates_tags(client):
             "edit_summary": "",
             "base_revision_id": str(article.current_revision_id),
             "article_version": article.version,
-            "categories": [],
+            "categories": "",
             "tags": "новый",
         },
     )
 
     article.refresh_from_db()
     assert list(article.tags.values_list("name", flat=True)) == ["новый"]
+
+
+def test_edit_article_view_prefills_existing_categories_and_tags(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = services.create_article(title="Статья", content_source="v1", created_by=user)
+    services.set_article_taxonomy(
+        article_id=article.pk, category_names=["HR"], tag_names=["отпуска"]
+    )
+
+    response = client.get(reverse("articles:edit", kwargs={"slug": article.slug}))
+    content = response.content.decode()
+    assert 'value="HR"' in content
+    assert 'value="отпуска"' in content
 
 
 def test_category_list_shows_top_level_categories(client):

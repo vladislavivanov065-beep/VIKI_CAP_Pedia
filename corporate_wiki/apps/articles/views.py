@@ -37,7 +37,7 @@ def article_create(request):
             else:
                 services.set_article_taxonomy(
                     article_id=article.pk,
-                    category_ids=[c.pk for c in form.cleaned_data["categories"]],
+                    category_names=form.cleaned_data["categories"],
                     tag_names=form.cleaned_data["tags"],
                 )
                 messages.success(request, "Статья создана.")
@@ -133,7 +133,7 @@ def article_edit(request, slug: str):
             else:
                 services.set_article_taxonomy(
                     article_id=article.pk,
-                    category_ids=[c.pk for c in form.cleaned_data["categories"]],
+                    category_names=form.cleaned_data["categories"],
                     tag_names=form.cleaned_data["tags"],
                 )
                 messages.success(request, "Изменения сохранены.")
@@ -144,7 +144,7 @@ def article_edit(request, slug: str):
                 "content_source": revision.content_source if revision else "",
                 "base_revision_id": article.current_revision_id,
                 "article_version": article.version,
-                "categories": article.categories.all(),
+                "categories": ", ".join(category.name for category in article.categories.all()),
                 "tags": ", ".join(tag.name for tag in article.tags.all()),
             }
         )
