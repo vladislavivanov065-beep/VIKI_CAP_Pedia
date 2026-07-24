@@ -17,6 +17,13 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=True)
 SECURE_SSL_REDIRECT = True
+# This app never terminates TLS itself -- something in front of it always
+# does (ngrok, a load balancer, ...) and forwards plain HTTP internally.
+# Without this, Django thinks every request is insecure and
+# SECURE_SSL_REDIRECT above redirects every single request to itself
+# forever, since the browser is already on https and the redirect target
+# is identical to the URL it just requested.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

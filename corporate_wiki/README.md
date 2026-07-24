@@ -19,6 +19,25 @@ docker compose up --build
 docker compose exec web pytest
 ```
 
+### Публикация через ngrok / другой туннель
+
+Без этого Django ответит `400 Bad Request` на все запросы, включая
+главную страницу — узнать домен, выданный ngrok, и указать его в `.env`
+**до** запуска `docker compose up`:
+
+```bash
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.ngrok-free.app
+DJANGO_CSRF_TRUSTED_ORIGINS=https://*.ngrok-free.app
+```
+
+(`.ngrok-free.app` — маска поддомена, переживает смену адреса при
+каждом перезапуске ngrok; если ngrok выдал домен на другом суффиксе,
+подставьте его). После изменения `.env` перезапустите контейнер:
+
+```bash
+docker compose up -d --build
+```
+
 ## Без Docker
 
 ```bash
