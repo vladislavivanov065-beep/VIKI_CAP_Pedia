@@ -3,7 +3,8 @@ import pytest
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
 from apps.assistant import services
-from apps.assistant.exceptions import AssistantRequestError
+from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
+from apps.assistant.models import AssistantSettings
 
 pytestmark = pytest.mark.django_db
 
@@ -90,4 +91,46 @@ def test_answer_question_propagates_not_configured_error(settings):
     from apps.assistant.exceptions import AssistantNotConfiguredError
 
     with pytest.raises(AssistantNotConfiguredError):
+        services.answer_question(article=article, question="Вопрос?")
+
+
+def test_is_assistant_enabled_defaults_to_true():
+    assert services.is_assistant_enabled() is True
+
+
+def test_set_assistant_enabled_persists_the_flag_and_actor():
+    admin = UserFactory()
+
+    services.set_assistant_enabled(enabled=False, actor=admin)
+
+    assert services.is_assistant_enabled() is False
+    solo = AssistantSettings.get_solo()
+    assert solo.updated_by == admin
+
+    services.set_assistant_enabled(enabled=True, actor=admin)
+    assert services.is_assistant_enabled() is True
+
+
+def test_answer_question_raises_when_disabled_by_admin(settings):
+    settings.OPENAI_API_KEY = "test-key"
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
+    services.set_assistant_enabled(enabled=False, actor=user)
+
+    with pytest.raises(AssistantDisabledError):
+        services.answer_question(article=article, question="Вопрос?")
+
+
+def test_answer_question_disabled_check_does_not_require_configured_key():
+    # Even with no OPENAI_API_KEY at all, being globally disabled is the
+    # error that should surface -- it's checked first.
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
+    services.set_assistant_enabled(enabled=False, actor=user)
+
+    with pytest.raises(AssistantDisabledError):
         services.answer_question(article=article, question="Вопрос?")

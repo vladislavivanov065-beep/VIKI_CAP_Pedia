@@ -14,9 +14,11 @@ import dataclasses
 import re
 from html import unescape
 
+from apps.accounts.models import User
 from apps.articles.models import Article
 from apps.assistant import openai_client
-from apps.assistant.exceptions import AssistantRequestError
+from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
+from apps.assistant.models import AssistantSettings
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -47,7 +49,21 @@ class AnswerResult:
     answer: str
 
 
+def is_assistant_enabled() -> bool:
+    return AssistantSettings.get_solo().is_enabled
+
+
+def set_assistant_enabled(*, enabled: bool, actor: User) -> None:
+    solo = AssistantSettings.get_solo()
+    solo.is_enabled = enabled
+    solo.updated_by = actor
+    solo.save(update_fields=["is_enabled", "updated_by", "updated_at"])
+
+
 def answer_question(*, article: Article, question: str) -> AnswerResult:
+    if not is_assistant_enabled():
+        raise AssistantDisabledError("ИИ-ассистент отключён администратором.")
+
     question = question.strip()
     if not question:
         raise AssistantRequestError("Введите вопрос.")

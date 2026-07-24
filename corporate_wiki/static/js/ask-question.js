@@ -10,6 +10,7 @@
         var url = form.getAttribute("data-ask-question-url");
         var articleSlug = form.getAttribute("data-article-slug");
         var csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        var consentCheckbox = form.querySelector("[data-ask-question-consent]");
 
         function showNote(text) {
             if (!note) {
@@ -31,6 +32,14 @@
             event.preventDefault();
             var question = form.querySelector("textarea[name='question']").value.trim();
             if (!question || !url) {
+                return;
+            }
+            if (consentCheckbox && consentCheckbox.disabled) {
+                showNote("Запросы к ChatGPT отключены администратором.");
+                return;
+            }
+            if (!consentCheckbox || !consentCheckbox.checked) {
+                showNote("Отметьте «Спросить у ChatGPT», чтобы отправить вопрос.");
                 return;
             }
 

@@ -103,12 +103,18 @@
                 {% csrf_token %}
                 <label for="ask-question-input" class="visually-hidden">Ваш вопрос</label>
                 <textarea id="ask-question-input" name="question" rows="3" placeholder="Например: как оформить перевыпуск карты?"></textarea>
+                <label class="ask-question-form__consent">
+                    <input type="checkbox" data-ask-question-consent {% if not assistant_enabled %}disabled{% endif %}>
+                    Спросить у ChatGPT
+                </label>
                 <button type="submit" class="button button--primary" data-ask-question-submit>Спросить</button>
             </form>
             <div class="ask-question-result" data-ask-question-result hidden>
                 <p class="ask-question-result__answer" data-ask-question-answer></p>
             </div>
-            <p class="text-secondary ask-question-form__note" data-ask-question-note hidden></p>
+            <p class="text-secondary ask-question-form__note" data-ask-question-note{% if assistant_enabled %} hidden{% endif %}>
+                {% if not assistant_enabled %}Запросы к ChatGPT отключены администратором.{% endif %}
+            </p>
         </div>
     {% endif %}
 {% endblock %}

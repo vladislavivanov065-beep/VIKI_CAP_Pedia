@@ -5,6 +5,8 @@ from django.urls import reverse
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
+from apps.assistant import services
+from apps.assistant.models import AssistantSettings
 from apps.assistant.services import AnswerResult
 
 pytestmark = pytest.mark.django_db
@@ -133,3 +135,82 @@ def test_ask_reports_request_error_as_bad_gateway(client, monkeypatch):
 
     assert response.status_code == 502
     assert "error" in response.json()
+
+
+def test_ask_reports_disabled_as_forbidden(client, settings):
+    settings.OPENAI_API_KEY = "test-key"
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
+    services.set_assistant_enabled(enabled=False, actor=user)
+
+    response = _ask(client, question="вопрос", article_slug=article.slug)
+
+    assert response.status_code == 403
+    assert "error" in response.json()
+
+
+def test_toggle_requires_authentication(client):
+    response = client.post(reverse("assistant:toggle"), {"assistant_enabled": "on"})
+    assert response.status_code == 302
+
+
+def test_toggle_requires_staff(client):
+    user = UserFactory(must_change_password=False, is_staff=False)
+    client.force_login(user)
+
+    response = client.post(reverse("assistant:toggle"), {"assistant_enabled": "on"})
+
+    assert response.status_code == 403
+
+
+def test_toggle_requires_post(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.get(reverse("assistant:toggle"))
+    assert response.status_code == 405
+
+
+def test_staff_can_enable_and_disable_assistant(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.post(reverse("assistant:toggle"), {})
+    assert response.status_code == 302
+    assert AssistantSettings.get_solo().is_enabled is False
+    assert AssistantSettings.get_solo().updated_by == admin
+
+    response = client.post(reverse("assistant:toggle"), {"assistant_enabled": "on"})
+    assert response.status_code == 302
+    assert AssistantSettings.get_solo().is_enabled is True
+
+
+def test_toggle_redirects_to_safe_referer(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.post(
+        reverse("assistant:toggle"),
+        {"assistant_enabled": "on"},
+        HTTP_REFERER="http://testserver/some/page/",
+    )
+
+    assert response.status_code == 302
+    assert response.url == "http://testserver/some/page/"
+
+
+def test_toggle_ignores_unsafe_referer(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.post(
+        reverse("assistant:toggle"),
+        {"assistant_enabled": "on"},
+        HTTP_REFERER="http://evil.example/",
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("home")

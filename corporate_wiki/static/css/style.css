@@ -477,10 +477,34 @@ a.link-missing {
     margin-bottom: 0.5rem;
 }
 
+.ask-question-form__consent {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: normal;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+
 .ask-question-form__note {
     margin-top: 0.6rem;
     font-size: 0.85rem;
     color: var(--link-missing);
+}
+
+.assistant-toggle {
+    margin-top: 0.6rem;
+}
+
+.assistant-toggle__label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: var(--text-secondary);
+    cursor: pointer;
 }
 
 .ask-question-result {
