@@ -97,14 +97,17 @@
 
         <div class="content-card rail-block">
             <h2 class="rail-block__title">Задай свой вопрос</h2>
-            <form class="ask-question-form" data-ask-question-form>
+            <form class="ask-question-form" data-ask-question-form data-ask-question-url="{% url 'assistant:ask' %}">
+                {% csrf_token %}
                 <label for="ask-question-input" class="visually-hidden">Ваш вопрос</label>
                 <textarea id="ask-question-input" name="question" rows="3" placeholder="Например: как оформить перевыпуск карты?"></textarea>
-                <button type="submit" class="button button--primary">Спросить</button>
-                <p class="text-secondary ask-question-form__note" data-ask-question-note hidden>
-                    Ответы на вопросы появятся здесь позже — эта функция ещё в разработке.
-                </p>
+                <button type="submit" class="button button--primary" data-ask-question-submit>Спросить</button>
             </form>
+            <div class="ask-question-result" data-ask-question-result hidden>
+                <p class="ask-question-result__answer" data-ask-question-answer></p>
+                <ul class="ask-question-result__sources" data-ask-question-sources></ul>
+            </div>
+            <p class="text-secondary ask-question-form__note" data-ask-question-note hidden></p>
         </div>
     {% endif %}
 {% endblock %}
