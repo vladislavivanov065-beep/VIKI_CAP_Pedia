@@ -19,6 +19,12 @@ if env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-change-me")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+# Needed to submit any form (e.g. login) when the site is reachable through
+# a tunnel/reverse proxy on a different origin than ALLOWED_HOSTS alone
+# would suggest to a browser (ngrok, a custom domain in front of Docker,
+# etc.) — Django's CSRF check compares the request's Origin/Referer
+# against this list for HTTPS requests.
+CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", default=[])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
