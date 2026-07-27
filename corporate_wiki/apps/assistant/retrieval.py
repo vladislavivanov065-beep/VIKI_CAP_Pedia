@@ -18,7 +18,7 @@ from apps.assistant.models import ArticleChunkEmbedding
 _MIN_SIMILARITY = 0.2
 
 
-def find_relevant_chunks(*, question: str, top_k: int = 5) -> list[ArticleChunkEmbedding]:
+def find_relevant_chunks(*, question: str, top_k: int = 3) -> list[ArticleChunkEmbedding]:
     chunks = list(
         ArticleChunkEmbedding.objects.filter(article__is_archived=False).select_related("article")
     )
@@ -26,7 +26,7 @@ def find_relevant_chunks(*, question: str, top_k: int = 5) -> list[ArticleChunkE
         return []
 
     matrix = np.stack([np.frombuffer(chunk.embedding, dtype=np.float32) for chunk in chunks])
-    (query_embedding,) = local_models.embed_texts([question])
+    (query_embedding,) = local_models.embed_texts([question], is_query=True)
     similarities = matrix @ query_embedding
 
     ranked_indices = np.argsort(-similarities)

@@ -68,3 +68,52 @@ def test_answer_from_corpus_returns_none_when_generation_fails(monkeypatch):
     monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", _raise)
 
     assert local_ai.answer_from_corpus(question="Когда оформлять отпуск?") is None
+
+
+def test_answer_from_corpus_discards_an_ungrounded_answer(monkeypatch):
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Оплата рекламы", content_source="текст", created_by=admin
+    )
+    chunk = ArticleChunkEmbedding.objects.create(
+        article=article,
+        chunk_index=0,
+        text=(
+            "Что можно оплачивать: рекламу и вспомогательные инструменты: "
+            "хостинги, домены, нейросети, ПО и софт. VPN и прокси оплатить нельзя."
+        ),
+        embedding=np.array([1, 0, 0], dtype=np.float32).tobytes(),
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
+    )
+
+    def fake_generate(*, context, question):
+        return (
+            "Чтобы оплатить, нужно указать сумму, которую хотите оплатить. "
+            "Например, если вам нужно 2500 USD, введите 2500 USD."
+        )
+
+    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", fake_generate)
+
+    assert local_ai.answer_from_corpus(question="Что можно оплачивать?") is None
+
+
+def test_answer_from_corpus_keeps_a_grounded_answer(monkeypatch):
+    chunk = _seed_one_chunk()
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
+    )
+
+    def fake_generate(*, context, question):
+        return "Отпуск нужно оформить за две недели."
+
+    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", fake_generate)
+
+    answer = local_ai.answer_from_corpus(question="Когда оформлять отпуск?")
+
+    assert answer == "Отпуск нужно оформить за две недели."
+
+
+def test_is_grounded_does_not_block_a_very_short_answer():
+    assert local_ai._is_grounded(answer="Да.", context="Совершенно другой текст.") is True

@@ -38,6 +38,10 @@ class AssistantSettings(models.Model):
     local_ai_article_count = models.PositiveIntegerField(default=0)
     local_ai_chunk_count = models.PositiveIntegerField(default=0)
     local_ai_last_error = models.TextField(blank=True, default="")
+    # Progress log for the run currently (or most recently) in progress,
+    # so the admin page can show it live -- see apps.assistant.training.
+    # Reset at the start of each retrain, truncated to the last N lines.
+    local_ai_log = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "настройки ИИ-ассистента"

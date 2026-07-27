@@ -1,9 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Локальный ИИ — {{ site_name }}{% endblock %}
 
 {% block content %}
-    <div class="content-card">
+    <div
+        class="content-card"
+        data-local-ai-root
+        data-status-url="{% url 'assistant:local_ai_status' %}"
+        data-training="{% if solo.local_ai_is_training %}true{% else %}false{% endif %}"
+    >
         <h1>Локальный ИИ</h1>
         <p class="text-secondary">
             Отвечает на вопросы по статьям полностью на этом сервере, без OpenAI: небольшая
@@ -12,27 +18,38 @@
             статьях не попадают в индекс автоматически.
         </p>
 
-        {% if solo.local_ai_is_training %}
-            <p><strong>Обучение выполняется…</strong> Обновите страницу через некоторое время.</p>
-        {% elif solo.local_ai_trained_at %}
-            <p>
+        <p data-local-ai-status>
+            {% if solo.local_ai_is_training %}
+                Обучение выполняется…
+            {% elif solo.local_ai_trained_at %}
                 Обучен: {{ solo.local_ai_trained_at|date:"d.m.Y H:i" }}
-                {% if solo.local_ai_trained_by %}({{ solo.local_ai_trained_by.display_name }}){% endif %}<br>
-                Статей: {{ solo.local_ai_article_count }}, фрагментов: {{ solo.local_ai_chunk_count }}
-            </p>
-        {% else %}
-            <p class="text-secondary">Ещё не обучен — ответы даются простым поиском по тексту статьи.</p>
-        {% endif %}
+                {% if solo.local_ai_trained_by %}({{ solo.local_ai_trained_by.display_name }}){% endif %}.
+                Статей: {{ solo.local_ai_article_count }}, фрагментов: {{ solo.local_ai_chunk_count }}.
+            {% else %}
+                Ещё не обучен — ответы даются простым поиском по тексту статьи.
+            {% endif %}
+        </p>
 
-        {% if solo.local_ai_last_error %}
-            <p class="ask-question-form__note">Последняя ошибка обучения: {{ solo.local_ai_last_error }}</p>
-        {% endif %}
+        <p class="ask-question-form__note" data-local-ai-error {% if not solo.local_ai_last_error %}hidden{% endif %}>
+            {% if solo.local_ai_last_error %}Последняя ошибка обучения: {{ solo.local_ai_last_error }}{% endif %}
+        </p>
+
+        <pre class="local-ai-log" data-local-ai-log>{{ solo.local_ai_log }}</pre>
 
         <form method="post" action="{% url 'assistant:retrain_local_ai' %}">
             {% csrf_token %}
-            <button type="submit" class="button button--primary" {% if solo.local_ai_is_training %}disabled{% endif %}>
+            <button
+                type="submit"
+                class="button button--primary"
+                data-local-ai-retrain-btn
+                {% if solo.local_ai_is_training %}disabled{% endif %}
+            >
                 Переобучить
             </button>
         </form>
     </div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/local-ai-admin.js' %}"></script>
 {% endblock %}

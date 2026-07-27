@@ -29,7 +29,7 @@ def test_find_relevant_chunks_ranks_by_similarity(monkeypatch):
 
     monkeypatch.setattr(
         "apps.assistant.retrieval.local_models.embed_texts",
-        lambda texts: np.array([[1, 0, 0]], dtype=np.float32),
+        lambda texts, **kwargs: np.array([[1, 0, 0]], dtype=np.float32),
     )
 
     results = retrieval.find_relevant_chunks(question="Когда оформлять отпуск?")
@@ -46,7 +46,7 @@ def test_find_relevant_chunks_excludes_low_similarity(monkeypatch):
 
     monkeypatch.setattr(
         "apps.assistant.retrieval.local_models.embed_texts",
-        lambda texts: np.array([[0, 1, 0]], dtype=np.float32),
+        lambda texts, **kwargs: np.array([[0, 1, 0]], dtype=np.float32),
     )
 
     assert retrieval.find_relevant_chunks(question="Совсем другой вопрос") == []
@@ -62,7 +62,7 @@ def test_find_relevant_chunks_excludes_archived_articles(monkeypatch):
 
     monkeypatch.setattr(
         "apps.assistant.retrieval.local_models.embed_texts",
-        lambda texts: np.array([[1, 0, 0]], dtype=np.float32),
+        lambda texts, **kwargs: np.array([[1, 0, 0]], dtype=np.float32),
     )
 
     assert retrieval.find_relevant_chunks(question="Вопрос про отпуск") == []
@@ -70,3 +70,25 @@ def test_find_relevant_chunks_excludes_archived_articles(monkeypatch):
 
 def test_find_relevant_chunks_returns_empty_when_nothing_trained():
     assert retrieval.find_relevant_chunks(question="Вопрос?") == []
+
+
+def test_find_relevant_chunks_embeds_the_question_as_a_query(monkeypatch):
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=admin
+    )
+    _make_chunk(article, index=0, text="Текст фрагмента.", vector=[1, 0, 0])
+
+    captured = {}
+
+    def fake_embed_texts(texts, **kwargs):
+        captured["texts"] = texts
+        captured["is_query"] = kwargs.get("is_query")
+        return np.array([[1, 0, 0]], dtype=np.float32)
+
+    monkeypatch.setattr("apps.assistant.retrieval.local_models.embed_texts", fake_embed_texts)
+
+    retrieval.find_relevant_chunks(question="Вопрос?")
+
+    assert captured["texts"] == ["Вопрос?"]
+    assert captured["is_query"] is True

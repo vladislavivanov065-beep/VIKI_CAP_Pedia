@@ -24,15 +24,28 @@ _generation_model = None
 _lock = threading.Lock()
 
 _SYSTEM_PROMPT = (
-    "Ты — ассистент корпоративной базы знаний. Используй ТОЛЬКО "
-    "приведённые ниже фрагменты статей, чтобы своими словами ответить на "
-    "вопрос. Если информации в них недостаточно, честно скажи об этом — "
-    "не придумывай факты. Отвечай кратко и по делу, на русском языке."
+    "Ты — ассистент корпоративной базы знаний. Тебе даны фрагменты статей и "
+    "вопрос. Отвечай СТРОГО и ТОЛЬКО на основе слов и фактов из фрагментов "
+    "ниже — не добавляй ничего, чего там нет, не придумывай примеры, цифры "
+    "или ситуации. Если фрагменты действительно не содержат ответа, ответь "
+    "ровно одной фразой: «В статьях нет ответа на этот вопрос.» Если ответ "
+    "есть — перескажи его своими словами, коротко (1-2 предложения), на "
+    "русском языке."
 )
+
+# intfloat/multilingual-e5-* models are trained on asymmetric "query: "/
+# "passage: " prefixes and lose retrieval quality without them; other
+# embedding models are used as-is.
+_E5_QUERY_PREFIX = "query: "
+_E5_PASSAGE_PREFIX = "passage: "
 
 
 def _cache_dir() -> str | None:
     return settings.LOCAL_AI_MODEL_CACHE_DIR or None
+
+
+def _is_e5_model() -> bool:
+    return "e5" in settings.LOCAL_AI_EMBEDDING_MODEL.lower()
 
 
 def _get_embedding_model():
@@ -48,10 +61,17 @@ def _get_embedding_model():
     return _embedding_model
 
 
-def embed_texts(texts: list[str]) -> np.ndarray:
+def embed_texts(texts: list[str], *, is_query: bool = False) -> np.ndarray:
     """Returns an (N, D) float32 array of L2-normalized embeddings, so
     cosine similarity reduces to a plain dot product.
+
+    is_query distinguishes a question (searching *for* a passage) from a
+    passage/chunk being indexed -- irrelevant for most embedding models,
+    but required for good results from the e5 family (see _is_e5_model).
     """
+    if _is_e5_model():
+        prefix = _E5_QUERY_PREFIX if is_query else _E5_PASSAGE_PREFIX
+        texts = [prefix + text for text in texts]
     model = _get_embedding_model()
     embeddings = model.encode(texts, normalize_embeddings=True, convert_to_numpy=True)
     return np.asarray(embeddings, dtype=np.float32)
@@ -74,7 +94,7 @@ def _get_generation_model():
     return _generation_tokenizer, _generation_model
 
 
-def generate_answer(*, context: str, question: str, max_new_tokens: int = 300) -> str:
+def generate_answer(*, context: str, question: str, max_new_tokens: int = 150) -> str:
     """Generates a synthesized answer from retrieved article fragments,
     using a small local instruct model -- not an extract of the input.
     """

@@ -11,7 +11,8 @@ import math
 import re
 from collections import Counter
 
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
+from apps.assistant.text_utils import split_sentences
+
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
 
 # Common short Russian words that carry no distinguishing meaning for
@@ -188,17 +189,13 @@ def _keywords(tokens: list[str]) -> list[str]:
     return [_normalize(t) for t in tokens if t not in _STOPWORDS and len(t) > 1]
 
 
-def _split_sentences(text: str) -> list[str]:
-    return [s.strip() for s in _SENTENCE_SPLIT_RE.split(text) if s.strip()]
-
-
 def find_best_sentences(*, text: str, question: str, max_sentences: int = 3) -> list[str]:
     """Ranks the article's sentences by TF-IDF overlap with the question's
     keywords and returns the top matches, in their original order. Returns
     an empty list if none of the question's meaningful words appear
     anywhere in the text.
     """
-    sentences = _split_sentences(text)
+    sentences = split_sentences(text)
     query_keywords = set(_keywords(_tokenize(question)))
     if not sentences or not query_keywords:
         return []
