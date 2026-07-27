@@ -1081,10 +1081,18 @@ a.attachment-link {
     border-radius: 4px;
     background: var(--background-page);
     max-width: 320px;
+    gap: 1rem;
+}
+
+/* Setting display unconditionally on .table-insert-panel would override
+   the browser's [hidden] { display: none } default -- an author-stylesheet
+   rule always wins over the UA stylesheet at equal specificity, hidden
+   attribute or not. Scoping it to :not([hidden]) keeps the panel actually
+   hidden until JS clears the attribute. */
+.table-insert-panel:not([hidden]) {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 1rem;
 }
 
 .table-insert-panel .form-row {
