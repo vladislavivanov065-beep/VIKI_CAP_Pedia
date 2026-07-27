@@ -37,6 +37,7 @@
             <h2 class="sidebar__heading">Администрирование</h2>
             <ul class="sidebar__list">
                 <li><a href="{% url 'articles:import_upload' %}">Импорт документа</a></li>
+                <li><a href="{% url 'assistant:local_ai_admin' %}">Локальный ИИ</a></li>
                 <li><a href="{% url 'admin:index' %}">Django Admin</a></li>
             </ul>
             <form method="post" action="{% url 'assistant:toggle' %}" class="assistant-toggle">

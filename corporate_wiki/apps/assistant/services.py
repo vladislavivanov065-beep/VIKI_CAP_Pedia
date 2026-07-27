@@ -11,17 +11,13 @@ question, never when an article is created or saved.
 from __future__ import annotations
 
 import dataclasses
-import re
-from html import unescape
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import local_search, openai_client
+from apps.assistant import local_ai, local_search, openai_client
 from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
 from apps.assistant.models import AssistantSettings
-
-_TAG_RE = re.compile(r"<[^>]+>")
-_WHITESPACE_RE = re.compile(r"\s+")
+from apps.assistant.text_utils import article_plain_text
 
 # A generous safety cap, well under the chat model's context window --
 # not a real chunking scheme, just a guard against a pathologically long
@@ -35,13 +31,6 @@ _SYSTEM_PROMPT = (
     "не придумывай факты и не используй знания извне. Отвечай кратко и "
     "по делу, на русском языке."
 )
-
-
-def _plain_text(article: Article) -> str:
-    revision = article.current_revision
-    html = revision.content_html if revision else ""
-    text = unescape(_TAG_RE.sub(" ", html or ""))
-    return _WHITESPACE_RE.sub(" ", text).strip()
 
 
 @dataclasses.dataclass
@@ -68,7 +57,7 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
     if not question:
         raise AssistantRequestError("Введите вопрос.")
 
-    article_text = _plain_text(article)
+    article_text = article_plain_text(article)
     if not article_text:
         return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
 
@@ -84,15 +73,25 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
 
 
 def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
-    """Answers from the article's own text using word-overlap search --
-    no OpenAI call, so this is unaffected by AssistantSettings and works
-    even when OPENAI_API_KEY isn't configured at all.
+    """Answers without any OpenAI call, so this is unaffected by
+    AssistantSettings.is_enabled and works even when OPENAI_API_KEY isn't
+    configured at all.
+
+    Prefers the trained local AI (a small self-hosted model that reasons
+    over passages retrieved from every article, see apps.assistant.local_ai)
+    when an administrator has retrained it at least once. Until then, or if
+    it fails for any reason, falls back to plain word-overlap search over
+    just the current article -- degrading gracefully rather than erroring.
     """
     question = question.strip()
     if not question:
         raise AssistantRequestError("Введите вопрос.")
 
-    article_text = _plain_text(article)
+    smart_answer = local_ai.answer_from_corpus(question=question)
+    if smart_answer is not None:
+        return AnswerResult(answer=smart_answer)
+
+    article_text = article_plain_text(article)
     if not article_text:
         return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
 
