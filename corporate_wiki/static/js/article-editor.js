@@ -1493,17 +1493,21 @@
 
     /* ------------------------------------------------------------------
      * Font colour / text highlight: native <input type="color"> pickers.
-     * Opening the native picker steals focus from the contenteditable
-     * surface asynchronously, so the selection is captured on mousedown
-     * (before that happens) and restored once a colour is actually
-     * picked -- the same pattern wireImageUpload uses for its file
-     * dialog.
+     * Opening the native OS picker steals focus from the contenteditable
+     * surface, and in some browsers that alone collapses/clears the
+     * document Selection immediately -- before any handler on the color
+     * input itself gets a chance to read it. So rather than capturing the
+     * selection reactively when the input is clicked, it's tracked
+     * continuously while the user is actually working in the surface
+     * (mouseup/keyup/selectionchange) and simply left in place; by the
+     * time the picker's `input` event fires, whatever was last selected
+     * in the surface is still on hand regardless of what focus did.
      * ------------------------------------------------------------------ */
 
     function wireColorPickers(surface, toolbar) {
         var savedRange = null;
 
-        function captureSelection() {
+        function trackSelection() {
             var selection = window.getSelection();
             if (
                 selection &&
@@ -1512,10 +1516,12 @@
                 !selection.getRangeAt(0).collapsed
             ) {
                 savedRange = selection.getRangeAt(0).cloneRange();
-            } else {
-                savedRange = null;
             }
         }
+
+        surface.addEventListener("mouseup", trackSelection);
+        surface.addEventListener("keyup", trackSelection);
+        document.addEventListener("selectionchange", trackSelection);
 
         function applyColor(cssProperty, value) {
             if (!savedRange) {
@@ -1536,7 +1542,6 @@
         }
 
         toolbar.querySelectorAll("[data-color-picker]").forEach(function (input) {
-            input.addEventListener("mousedown", captureSelection);
             input.addEventListener("input", function () {
                 if (!savedRange) {
                     window.alert("Сначала выделите текст.");
