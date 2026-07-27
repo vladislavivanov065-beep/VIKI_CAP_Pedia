@@ -134,3 +134,69 @@ def test_answer_question_disabled_check_does_not_require_configured_key():
 
     with pytest.raises(AssistantDisabledError):
         services.answer_question(article=article, question="Вопрос?")
+
+
+def test_answer_question_locally_rejects_empty_question():
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст статьи", created_by=user
+    )
+
+    with pytest.raises(AssistantRequestError):
+        services.answer_question_locally(article=article, question="   ")
+
+
+def test_answer_question_locally_returns_canned_reply_for_empty_article():
+    user = UserFactory()
+    article = article_services.create_article(title="Пустая", content_source="", created_by=user)
+
+    result = services.answer_question_locally(article=article, question="Есть тут что-то?")
+
+    assert "пока нет текста" in result.answer.lower()
+
+
+def test_answer_question_locally_finds_matching_sentence():
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+
+    result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
+
+    assert "Отпуск оформляется за две недели." in result.answer
+
+
+def test_answer_question_locally_returns_canned_reply_when_nothing_matches():
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+
+    result = services.answer_question_locally(article=article, question="Какая погода сегодня?")
+
+    assert "не удалось найти ответ" in result.answer.lower()
+
+
+def test_answer_question_locally_does_not_require_openai_key(settings):
+    settings.OPENAI_API_KEY = ""
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+
+    result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
+
+    assert "Отпуск оформляется за две недели." in result.answer
+
+
+def test_answer_question_locally_ignores_global_disable(settings):
+    settings.OPENAI_API_KEY = ""
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+    services.set_assistant_enabled(enabled=False, actor=user)
+
+    result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
+
+    assert "Отпуск оформляется за две недели." in result.answer

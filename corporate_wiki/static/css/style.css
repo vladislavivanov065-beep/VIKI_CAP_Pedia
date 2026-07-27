@@ -487,6 +487,11 @@ a.link-missing {
     cursor: pointer;
 }
 
+.ask-question-form__hint {
+    font-size: 0.78rem;
+    margin: -0.2rem 0 0.6rem;
+}
+
 .ask-question-form__note {
     margin-top: 0.6rem;
     font-size: 0.85rem;

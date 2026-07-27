@@ -34,16 +34,16 @@
             if (!question || !url) {
                 return;
             }
-            if (consentCheckbox && consentCheckbox.disabled) {
-                showNote("Запросы к ChatGPT отключены администратором.");
-                return;
-            }
-            if (!consentCheckbox || !consentCheckbox.checked) {
-                showNote("Отметьте «Спросить у ChatGPT», чтобы отправить вопрос.");
-                return;
-            }
 
-            showNote("");
+            // A disabled checkbox means the admin turned ChatGPT off site-wide --
+            // that only rules out the ChatGPT path, the local search still runs.
+            var useChatGPT = !!(consentCheckbox && !consentCheckbox.disabled && consentCheckbox.checked);
+
+            if (consentCheckbox && consentCheckbox.disabled) {
+                showNote("Запросы к ChatGPT отключены администратором. Ищу ответ в тексте статьи…");
+            } else {
+                showNote(useChatGPT ? "Спрашиваю у ChatGPT…" : "Ищу ответ в тексте статьи…");
+            }
             if (resultBox) {
                 resultBox.hidden = true;
             }
@@ -58,7 +58,11 @@
                     "Content-Type": "application/json",
                     "X-CSRFToken": csrfInput ? csrfInput.value : "",
                 },
-                body: JSON.stringify({ question: question, article_slug: articleSlug }),
+                body: JSON.stringify({
+                    question: question,
+                    article_slug: articleSlug,
+                    use_chatgpt: useChatGPT,
+                }),
             })
                 .then(function (response) {
                     return response.json().then(function (data) {
@@ -70,6 +74,7 @@
                         showNote(result.data.error || "Не удалось получить ответ.");
                         return;
                     }
+                    showNote("");
                     renderAnswer(result.data.answer);
                 })
                 .catch(function () {
