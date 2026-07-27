@@ -16,7 +16,7 @@ from html import unescape
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import openai_client
+from apps.assistant import local_search, openai_client
 from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
 from apps.assistant.models import AssistantSettings
 
@@ -81,3 +81,23 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
         system_prompt=_SYSTEM_PROMPT, user_prompt=user_prompt
     )
     return AnswerResult(answer=answer.strip())
+
+
+def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
+    """Answers from the article's own text using word-overlap search --
+    no OpenAI call, so this is unaffected by AssistantSettings and works
+    even when OPENAI_API_KEY isn't configured at all.
+    """
+    question = question.strip()
+    if not question:
+        raise AssistantRequestError("Введите вопрос.")
+
+    article_text = _plain_text(article)
+    if not article_text:
+        return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
+
+    matches = local_search.find_best_sentences(text=article_text, question=question)
+    if not matches:
+        return AnswerResult(answer="Не удалось найти ответ на этот вопрос в тексте статьи.")
+
+    return AnswerResult(answer=" ".join(matches))

@@ -27,6 +27,7 @@ def ask_question(request):
 
     question = str(payload.get("question", "")).strip()
     slug = str(payload.get("article_slug", "")).strip()
+    use_chatgpt = bool(payload.get("use_chatgpt", False))
     if not question:
         return JsonResponse({"error": "Введите вопрос."}, status=400)
     if not slug:
@@ -35,7 +36,12 @@ def ask_question(request):
     article = get_object_or_404(Article, slug=slug, is_archived=False)
 
     try:
-        result = services.answer_question(article=article, question=question)
+        if use_chatgpt:
+            result = services.answer_question(article=article, question=question)
+            source = "chatgpt"
+        else:
+            result = services.answer_question_locally(article=article, question=question)
+            source = "local"
     except AssistantDisabledError as exc:
         return JsonResponse({"error": str(exc)}, status=403)
     except AssistantNotConfiguredError as exc:
@@ -43,7 +49,7 @@ def ask_question(request):
     except AssistantRequestError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 
-    return JsonResponse({"answer": result.answer})
+    return JsonResponse({"answer": result.answer, "source": source})
 
 
 @require_POST

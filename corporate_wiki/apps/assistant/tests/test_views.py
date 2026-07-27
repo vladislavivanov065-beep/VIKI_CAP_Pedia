@@ -91,10 +91,46 @@ def test_ask_returns_answer(client, monkeypatch):
         lambda article, question: AnswerResult(answer="Ответ на вопрос."),
     )
 
-    response = _ask(client, question="Как оформить отпуск?", article_slug=article.slug)
+    response = _ask(
+        client, question="Как оформить отпуск?", article_slug=article.slug, use_chatgpt=True
+    )
 
     assert response.status_code == 200
-    assert response.json() == {"answer": "Ответ на вопрос."}
+    assert response.json() == {"answer": "Ответ на вопрос.", "source": "chatgpt"}
+
+
+def test_ask_defaults_to_local_search_without_use_chatgpt_flag(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+
+    response = _ask(client, question="Когда оформлять отпуск?", article_slug=article.slug)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "local"
+    assert "Отпуск оформляется за две недели." in body["answer"]
+
+
+def test_ask_local_search_ignores_global_disable(client):
+    user = UserFactory(must_change_password=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+    services.set_assistant_enabled(enabled=False, actor=user)
+
+    response = _ask(
+        client,
+        question="Когда оформлять отпуск?",
+        article_slug=article.slug,
+        use_chatgpt=False,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["source"] == "local"
 
 
 def test_ask_reports_not_configured_as_service_unavailable(client, monkeypatch):
@@ -111,7 +147,7 @@ def test_ask_reports_not_configured_as_service_unavailable(client, monkeypatch):
 
     monkeypatch.setattr("apps.assistant.views.services.answer_question", _raise)
 
-    response = _ask(client, question="вопрос", article_slug=article.slug)
+    response = _ask(client, question="вопрос", article_slug=article.slug, use_chatgpt=True)
 
     assert response.status_code == 503
     assert "error" in response.json()
@@ -131,7 +167,7 @@ def test_ask_reports_request_error_as_bad_gateway(client, monkeypatch):
 
     monkeypatch.setattr("apps.assistant.views.services.answer_question", _raise)
 
-    response = _ask(client, question="вопрос", article_slug=article.slug)
+    response = _ask(client, question="вопрос", article_slug=article.slug, use_chatgpt=True)
 
     assert response.status_code == 502
     assert "error" in response.json()
@@ -146,7 +182,7 @@ def test_ask_reports_disabled_as_forbidden(client, settings):
     )
     services.set_assistant_enabled(enabled=False, actor=user)
 
-    response = _ask(client, question="вопрос", article_slug=article.slug)
+    response = _ask(client, question="вопрос", article_slug=article.slug, use_chatgpt=True)
 
     assert response.status_code == 403
     assert "error" in response.json()
