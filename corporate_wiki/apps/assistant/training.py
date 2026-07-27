@@ -23,11 +23,14 @@ from apps.accounts.models import User
 from apps.articles.models import Article
 from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
-from apps.assistant.text_utils import article_plain_text
+from apps.assistant.text_utils import article_plain_text, split_sentences
 
-# Small enough that a tiny local embedding model can encode each chunk
-# meaningfully, large enough to give the generator real context per hit.
-_CHUNK_CHARS = 800
+# Chunks are grouped whole sentences, never split mid-sentence, up to this
+# many characters -- small enough that each chunk stays about one topic
+# (so its embedding isn't diluted by unrelated neighbouring sentences),
+# large enough to still give the generator a couple of sentences of real
+# context per hit.
+_CHUNK_CHARS = 400
 
 # Keeps local_ai_log from growing without bound across many retrains.
 _MAX_LOG_LINES = 500
@@ -38,17 +41,17 @@ class LocalAiAlreadyTrainingError(Exception):
 
 
 def _chunk_text(text: str, *, chunk_chars: int = _CHUNK_CHARS) -> list[str]:
-    words = text.split()
+    sentences = split_sentences(text)
     chunks: list[str] = []
     current: list[str] = []
     current_len = 0
-    for word in words:
-        current.append(word)
-        current_len += len(word) + 1
-        if current_len >= chunk_chars:
+    for sentence in sentences:
+        if current and current_len + len(sentence) + 1 > chunk_chars:
             chunks.append(" ".join(current))
             current = []
             current_len = 0
+        current.append(sentence)
+        current_len += len(sentence) + 1
     if current:
         chunks.append(" ".join(current))
     return chunks

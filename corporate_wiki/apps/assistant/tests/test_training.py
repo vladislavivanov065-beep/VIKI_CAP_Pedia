@@ -184,3 +184,33 @@ def test_start_retrain_in_background_raises_synchronously_when_already_training(
 
     with pytest.raises(training.LocalAiAlreadyTrainingError):
         training.start_retrain_in_background(actor=admin)
+
+
+def test_chunk_text_never_splits_a_sentence_across_chunks():
+    text = (
+        "Первое предложение тут. "
+        "Что можно оплачивать: рекламу и хостинги, домены, нейросети. "
+        "Третье предложение здесь."
+    )
+
+    chunks = training._chunk_text(text, chunk_chars=40)
+
+    for sentence in [
+        "Первое предложение тут.",
+        "Что можно оплачивать: рекламу и хостинги, домены, нейросети.",
+        "Третье предложение здесь.",
+    ]:
+        assert any(sentence in chunk for chunk in chunks)
+
+
+def test_chunk_text_keeps_a_single_long_sentence_as_one_chunk():
+    long_sentence = "Слово " * 30 + "тут."
+
+    chunks = training._chunk_text(long_sentence, chunk_chars=20)
+
+    assert len(chunks) == 1
+    assert chunks[0] == long_sentence
+
+
+def test_chunk_text_returns_empty_list_for_empty_text():
+    assert training._chunk_text("") == []

@@ -162,7 +162,7 @@ OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
 # from Hugging Face on first use and cached under LOCAL_AI_MODEL_CACHE_DIR;
 # until an administrator has retrained at least once, this mode has no
 # index to search and apps.assistant falls back to plain text search.
-LOCAL_AI_EMBEDDING_MODEL = env("LOCAL_AI_EMBEDDING_MODEL", default="cointegrated/rubert-tiny2")
+LOCAL_AI_EMBEDDING_MODEL = env("LOCAL_AI_EMBEDDING_MODEL", default="intfloat/multilingual-e5-small")
 LOCAL_AI_GENERATION_MODEL = env("LOCAL_AI_GENERATION_MODEL", default="Qwen/Qwen2.5-0.5B-Instruct")
 LOCAL_AI_MODEL_CACHE_DIR = env("LOCAL_AI_MODEL_CACHE_DIR", default="")
 
