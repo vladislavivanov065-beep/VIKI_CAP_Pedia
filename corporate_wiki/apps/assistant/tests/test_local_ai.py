@@ -9,7 +9,7 @@ from apps.assistant.models import ArticleChunkEmbedding
 pytestmark = pytest.mark.django_db
 
 
-def _seed_one_chunk():
+def _seed_one_chunk(*, text="Отпуск оформляется за две недели."):
     admin = UserFactory()
     article = article_services.create_article(
         title="Отпуска", content_source="текст", created_by=admin
@@ -17,7 +17,7 @@ def _seed_one_chunk():
     return ArticleChunkEmbedding.objects.create(
         article=article,
         chunk_index=0,
-        text="Отпуск оформляется за две недели.",
+        text=text,
         embedding=np.array([1, 0, 0], dtype=np.float32).tobytes(),
     )
 
@@ -33,87 +33,72 @@ def test_answer_from_corpus_returns_none_when_nothing_relevant_found(monkeypatch
     assert local_ai.answer_from_corpus(question="Когда оформлять отпуск?") is None
 
 
-def test_answer_from_corpus_generates_answer_from_retrieved_chunks(monkeypatch):
-    chunk = _seed_one_chunk()
+def test_answer_from_corpus_extracts_the_matching_sentence_from_the_best_chunk(monkeypatch):
+    chunk = _seed_one_chunk(
+        text=(
+            "Обед начинается в полдень. "
+            "Отпуск оформляется за две недели. "
+            "Столовая на первом этаже."
+        )
+    )
     captured = {}
 
-    monkeypatch.setattr(
-        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
-    )
-
-    def fake_generate(*, context, question):
-        captured["context"] = context
+    def fake_find_relevant_chunks(*, question, top_k):
         captured["question"] = question
-        return "Отпуск нужно оформить за две недели."
+        captured["top_k"] = top_k
+        return [chunk]
 
-    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", fake_generate)
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks", fake_find_relevant_chunks
+    )
 
     answer = local_ai.answer_from_corpus(question="Когда оформлять отпуск?")
 
-    assert answer == "Отпуск нужно оформить за две недели."
-    assert "Отпуск оформляется за две недели." in captured["context"]
-    assert "Отпуска" in captured["context"]
+    assert answer == "Отпуск оформляется за две недели."
     assert captured["question"] == "Когда оформлять отпуск?"
+    assert captured["top_k"] == 1
 
 
-def test_answer_from_corpus_returns_none_when_generation_fails(monkeypatch):
-    chunk = _seed_one_chunk()
+def test_answer_from_corpus_falls_back_to_the_whole_chunk_without_keyword_overlap(monkeypatch):
+    # The retrieved chunk matched semantically (that's what embeddings are
+    # for) but shares no exact keywords with the question -- still worth
+    # returning as-is rather than discarding a genuinely relevant chunk.
+    chunk = _seed_one_chunk(text="Единственное предложение фрагмента.")
     monkeypatch.setattr(
         "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
     )
 
-    def _raise(*, context, question):
+    answer = local_ai.answer_from_corpus(question="Совершенно другой вопрос")
+
+    assert answer == "Единственное предложение фрагмента."
+
+
+def test_answer_from_corpus_never_returns_more_than_one_sentence(monkeypatch):
+    chunk = _seed_one_chunk(
+        text=(
+            "Отпуск оформляется за две недели. "
+            "Отпуск можно продлить по заявлению. "
+            "Обед начинается в полдень."
+        )
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
+    )
+
+    answer = local_ai.answer_from_corpus(question="Как оформить отпуск?")
+
+    assert answer in (
+        "Отпуск оформляется за две недели.",
+        "Отпуск можно продлить по заявлению.",
+    )
+
+
+def test_answer_from_corpus_returns_none_on_unexpected_error(monkeypatch):
+    _seed_one_chunk()
+
+    def _raise(**_kwargs):
         raise RuntimeError("модель недоступна")
 
-    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", _raise)
+    monkeypatch.setattr("apps.assistant.local_ai.retrieval.find_relevant_chunks", _raise)
 
     assert local_ai.answer_from_corpus(question="Когда оформлять отпуск?") is None
-
-
-def test_answer_from_corpus_discards_an_ungrounded_answer(monkeypatch):
-    admin = UserFactory()
-    article = article_services.create_article(
-        title="Оплата рекламы", content_source="текст", created_by=admin
-    )
-    chunk = ArticleChunkEmbedding.objects.create(
-        article=article,
-        chunk_index=0,
-        text=(
-            "Что можно оплачивать: рекламу и вспомогательные инструменты: "
-            "хостинги, домены, нейросети, ПО и софт. VPN и прокси оплатить нельзя."
-        ),
-        embedding=np.array([1, 0, 0], dtype=np.float32).tobytes(),
-    )
-    monkeypatch.setattr(
-        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
-    )
-
-    def fake_generate(*, context, question):
-        return (
-            "Чтобы оплатить, нужно указать сумму, которую хотите оплатить. "
-            "Например, если вам нужно 2500 USD, введите 2500 USD."
-        )
-
-    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", fake_generate)
-
-    assert local_ai.answer_from_corpus(question="Что можно оплачивать?") is None
-
-
-def test_answer_from_corpus_keeps_a_grounded_answer(monkeypatch):
-    chunk = _seed_one_chunk()
-    monkeypatch.setattr(
-        "apps.assistant.local_ai.retrieval.find_relevant_chunks", lambda **_: [chunk]
-    )
-
-    def fake_generate(*, context, question):
-        return "Отпуск нужно оформить за две недели."
-
-    monkeypatch.setattr("apps.assistant.local_ai.local_models.generate_answer", fake_generate)
-
-    answer = local_ai.answer_from_corpus(question="Когда оформлять отпуск?")
-
-    assert answer == "Отпуск нужно оформить за две недели."
-
-
-def test_is_grounded_does_not_block_a_very_short_answer():
-    assert local_ai._is_grounded(answer="Да.", context="Совершенно другой текст.") is True

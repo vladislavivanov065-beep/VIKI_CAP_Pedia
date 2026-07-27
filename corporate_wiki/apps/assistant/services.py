@@ -77,8 +77,8 @@ def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
     AssistantSettings.is_enabled and works even when OPENAI_API_KEY isn't
     configured at all.
 
-    Prefers the trained local AI (a small self-hosted model that reasons
-    over passages retrieved from every article, see apps.assistant.local_ai)
+    Prefers the trained local AI (an embedding model that finds the single
+    best-matching sentence across every article, see apps.assistant.local_ai)
     when an administrator has retrained it at least once. Until then, or if
     it fails for any reason, falls back to plain word-overlap search over
     just the current article -- degrading gracefully rather than erroring.

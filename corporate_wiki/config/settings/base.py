@@ -156,14 +156,14 @@ MAX_ATTACHMENT_SIZE_MB = env.int("MAX_ATTACHMENT_SIZE_MB", default=20)
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
 
-# Local (offline, no OpenAI) answer generation -- a small self-hosted model
-# does retrieval-augmented generation over an index built from all articles
-# by an administrator ("Переобучить локальный ИИ"). Weights are downloaded
-# from Hugging Face on first use and cached under LOCAL_AI_MODEL_CACHE_DIR;
-# until an administrator has retrained at least once, this mode has no
-# index to search and apps.assistant falls back to plain text search.
+# Local (offline, no OpenAI) answer extraction -- a small self-hosted
+# embedding model finds the single most relevant sentence across every
+# article, from an index built by an administrator ("Переобучить локальный
+# ИИ"). Weights are downloaded from Hugging Face on first use and cached
+# under LOCAL_AI_MODEL_CACHE_DIR; until an administrator has retrained at
+# least once, this mode has no index to search and apps.assistant falls
+# back to plain text search on the current article.
 LOCAL_AI_EMBEDDING_MODEL = env("LOCAL_AI_EMBEDDING_MODEL", default="intfloat/multilingual-e5-small")
-LOCAL_AI_GENERATION_MODEL = env("LOCAL_AI_GENERATION_MODEL", default="Qwen/Qwen2.5-0.5B-Instruct")
 LOCAL_AI_MODEL_CACHE_DIR = env("LOCAL_AI_MODEL_CACHE_DIR", default="")
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never

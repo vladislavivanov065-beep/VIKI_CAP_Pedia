@@ -12,13 +12,13 @@ import numpy as np
 from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding
 
-# Below this similarity, a chunk is treated as unrelated rather than fed
-# to the generator as context -- keeps an off-topic question from being
-# "answered" out of whatever chunk happened to rank highest regardless.
+# Below this similarity, a chunk is treated as unrelated -- keeps an
+# off-topic question from being "answered" out of whatever chunk happened
+# to rank highest regardless.
 _MIN_SIMILARITY = 0.2
 
 
-def find_relevant_chunks(*, question: str, top_k: int = 3) -> list[ArticleChunkEmbedding]:
+def find_relevant_chunks(*, question: str, top_k: int = 1) -> list[ArticleChunkEmbedding]:
     chunks = list(
         ArticleChunkEmbedding.objects.filter(article__is_archived=False).select_related("article")
     )

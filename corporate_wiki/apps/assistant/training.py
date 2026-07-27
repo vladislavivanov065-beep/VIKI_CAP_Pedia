@@ -26,10 +26,10 @@ from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
 from apps.assistant.text_utils import article_plain_text, split_sentences
 
 # Chunks are grouped whole sentences, never split mid-sentence, up to this
-# many characters -- small enough that each chunk stays about one topic
-# (so its embedding isn't diluted by unrelated neighbouring sentences),
-# large enough to still give the generator a couple of sentences of real
-# context per hit.
+# many characters -- small enough that each chunk stays about one topic,
+# so its embedding isn't diluted by unrelated neighbouring sentences and
+# apps.assistant.local_ai's sentence extraction has a focused pool to
+# search within.
 _CHUNK_CHARS = 400
 
 # Keeps local_ai_log from growing without bound across many retrains.
