@@ -1492,20 +1492,31 @@
     }
 
     /* ------------------------------------------------------------------
-     * Font colour / text highlight: native <input type="color"> pickers.
-     * Opening the native OS picker steals focus from the contenteditable
-     * surface, and in some browsers that alone collapses/clears the
-     * document Selection immediately -- before any handler on the color
-     * input itself gets a chance to read it. So rather than capturing the
-     * selection reactively when the input is clicked, it's tracked
-     * continuously while the user is actually working in the surface
-     * (mouseup/keyup/selectionchange) and simply left in place; by the
-     * time the picker's `input` event fires, whatever was last selected
-     * in the surface is still on hand regardless of what focus did.
+     * Font colour / text highlight: a small on-page palette instead of
+     * the native <input type="color"> dialog. The native OS picker is
+     * outside the page's control -- it steals focus from the
+     * contenteditable surface, collapses the document Selection in the
+     * process in some browsers, and closes itself the moment a colour is
+     * clicked, none of which JS can prevent. A plain palette of buttons
+     * behaves like the existing image/table mini-toolbars instead: stays
+     * open across repeated clicks, only closes on an outside click, and
+     * -- since clicking a same-page button doesn't disrupt the selection
+     * the way a native modal does -- never needs a "please select text
+     * first" warning either.
      * ------------------------------------------------------------------ */
+
+    var TEXT_COLOR_SWATCHES = [
+        "#000000", "#c0392b", "#e67e22", "#2e7d32", "#1565c0", "#6a1b9a", "#616161",
+    ];
+    var BACKGROUND_COLOR_SWATCHES = [
+        "#fff59d", "#a5d6a7", "#90caf9", "#f48fb1", "#ffcc80", "#ce93d8",
+    ];
 
     function wireColorPickers(surface, toolbar) {
         var savedRange = null;
+        var activeSpan = null;
+        var palette = null;
+        var paletteAnchor = null;
 
         function trackSelection() {
             var selection = window.getSelection();
@@ -1516,6 +1527,7 @@
                 !selection.getRangeAt(0).collapsed
             ) {
                 savedRange = selection.getRangeAt(0).cloneRange();
+                activeSpan = null;
             }
         }
 
@@ -1524,6 +1536,10 @@
         document.addEventListener("selectionchange", trackSelection);
 
         function applyColor(cssProperty, value) {
+            if (activeSpan) {
+                activeSpan.style[cssProperty] = value;
+                return;
+            }
             if (!savedRange) {
                 return;
             }
@@ -1538,18 +1554,82 @@
             next.selectNodeContents(span);
             next.collapse(false);
             selection.addRange(next);
-            savedRange = null;
+            activeSpan = span;
         }
 
-        toolbar.querySelectorAll("[data-color-picker]").forEach(function (input) {
-            input.addEventListener("input", function () {
-                if (!savedRange) {
-                    window.alert("Сначала выделите текст.");
+        function closePalette() {
+            if (palette) {
+                palette.remove();
+                palette = null;
+                paletteAnchor = null;
+            }
+        }
+
+        function positionPalette() {
+            if (!palette || !paletteAnchor) {
+                return;
+            }
+            var rect = paletteAnchor.getBoundingClientRect();
+            palette.style.left = window.scrollX + rect.left + "px";
+            palette.style.top = window.scrollY + rect.bottom + 4 + "px";
+        }
+
+        function openPalette(anchor, cssProperty, swatches) {
+            closePalette();
+            paletteAnchor = anchor;
+            palette = document.createElement("div");
+            palette.className = "wysiwyg-color-palette";
+            palette.setAttribute("contenteditable", "false");
+
+            swatches.forEach(function (color) {
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "wysiwyg-color-palette__swatch";
+                btn.style.background = color;
+                btn.title = color;
+                btn.addEventListener("click", function () {
+                    applyColor(cssProperty, color);
+                });
+                palette.appendChild(btn);
+            });
+
+            var customInput = document.createElement("input");
+            customInput.type = "color";
+            customInput.className = "wysiwyg-color-palette__custom";
+            customInput.title = "Свой цвет";
+            customInput.addEventListener("input", function () {
+                applyColor(cssProperty, customInput.value);
+            });
+            palette.appendChild(customInput);
+
+            document.body.appendChild(palette);
+            positionPalette();
+        }
+
+        toolbar.querySelectorAll("[data-color-open]").forEach(function (button) {
+            var cssProperty = button.getAttribute("data-color-open");
+            var swatches = cssProperty === "color" ? TEXT_COLOR_SWATCHES : BACKGROUND_COLOR_SWATCHES;
+            button.addEventListener("click", function () {
+                if (palette && paletteAnchor === button) {
+                    closePalette();
                     return;
                 }
-                applyColor(input.getAttribute("data-color-picker"), input.value);
+                openPalette(button, cssProperty, swatches);
             });
         });
+
+        document.addEventListener("mousedown", function (event) {
+            if (
+                palette &&
+                !event.target.closest(".wysiwyg-color-palette") &&
+                !event.target.closest("[data-color-open]")
+            ) {
+                closePalette();
+            }
+        });
+
+        window.addEventListener("scroll", positionPalette, true);
+        window.addEventListener("resize", positionPalette);
     }
 
     /* ------------------------------------------------------------------
