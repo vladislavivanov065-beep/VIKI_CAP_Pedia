@@ -189,7 +189,7 @@ def _keywords(tokens: list[str]) -> list[str]:
     return [_normalize(t) for t in tokens if t not in _STOPWORDS and len(t) > 1]
 
 
-def find_best_sentences(*, text: str, question: str, max_sentences: int = 3) -> list[str]:
+def find_best_sentences(*, text: str, question: str, max_sentences: int = 1) -> list[str]:
     """Ranks the article's sentences by TF-IDF overlap with the question's
     keywords and returns the top matches, in their original order. Returns
     an empty list if none of the question's meaningful words appear
