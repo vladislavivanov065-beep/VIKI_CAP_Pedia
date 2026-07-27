@@ -5,17 +5,18 @@ import json
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.articles.models import Article
-from apps.assistant import services
+from apps.assistant import services, training
 from apps.assistant.exceptions import (
     AssistantDisabledError,
     AssistantNotConfiguredError,
     AssistantRequestError,
 )
+from apps.assistant.models import AssistantSettings
 
 
 @require_POST
@@ -67,3 +68,33 @@ def toggle_assistant(request):
     ):
         return redirect(referer)
     return redirect("home")
+
+
+def local_ai_admin(request):
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    return render(request, "assistant/local_ai_admin.html", {"solo": AssistantSettings.get_solo()})
+
+
+@require_POST
+def retrain_local_ai(request):
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    try:
+        training.retrain_local_model(actor=request.user)
+    except training.LocalAiAlreadyTrainingError as exc:
+        messages.error(request, str(exc))
+        return redirect("assistant:local_ai_admin")
+
+    solo = AssistantSettings.get_solo()
+    if solo.local_ai_last_error:
+        messages.error(request, f"Обучение завершилось с ошибкой: {solo.local_ai_last_error}")
+    else:
+        messages.success(
+            request,
+            f"Локальный ИИ обучен на {solo.local_ai_article_count} статьях "
+            f"({solo.local_ai_chunk_count} фрагментов).",
+        )
+    return redirect("assistant:local_ai_admin")

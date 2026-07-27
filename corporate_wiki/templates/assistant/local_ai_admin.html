@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Локальный ИИ — {{ site_name }}{% endblock %}
+
+{% block content %}
+    <div class="content-card">
+        <h1>Локальный ИИ</h1>
+        <p class="text-secondary">
+            Отвечает на вопросы по статьям полностью на этом сервере, без OpenAI: небольшая
+            модель ищет релевантные фрагменты во всех статьях и формулирует ответ своими
+            словами. Нажмите «Переобучить», чтобы модель учла текущие статьи — изменения в
+            статьях не попадают в индекс автоматически.
+        </p>
+
+        {% if solo.local_ai_is_training %}
+            <p><strong>Обучение выполняется…</strong> Обновите страницу через некоторое время.</p>
+        {% elif solo.local_ai_trained_at %}
+            <p>
+                Обучен: {{ solo.local_ai_trained_at|date:"d.m.Y H:i" }}
+                {% if solo.local_ai_trained_by %}({{ solo.local_ai_trained_by.display_name }}){% endif %}<br>
+                Статей: {{ solo.local_ai_article_count }}, фрагментов: {{ solo.local_ai_chunk_count }}
+            </p>
+        {% else %}
+            <p class="text-secondary">Ещё не обучен — ответы даются простым поиском по тексту статьи.</p>
+        {% endif %}
+
+        {% if solo.local_ai_last_error %}
+            <p class="ask-question-form__note">Последняя ошибка обучения: {{ solo.local_ai_last_error }}</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'assistant:retrain_local_ai' %}">
+            {% csrf_token %}
+            <button type="submit" class="button button--primary" {% if solo.local_ai_is_training %}disabled{% endif %}>
+                Переобучить
+            </button>
+        </form>
+    </div>
+{% endblock %}
