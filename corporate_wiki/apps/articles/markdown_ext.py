@@ -31,6 +31,14 @@ ATTACHMENT_EMBED_RE = r"\[\[attachment:([^\|\]]+)(?:\|([^\]]+))?\]\]"
 # IMAGE_SIZE_CLASSES below for the allowed values.
 IMAGE_EMBED_RE = r"!\[\[image:([^\|\]]+)(?:\|([^\|\]]*))?(?:\|([^\]]+))?\]\]"
 STRIKETHROUGH_RE = r"(~~)(.*?)~~"
+# Font colour / text highlight (section N): {color:#RRGGBB}text{/color} and
+# {bg:#RRGGBB}text{/bg}. The six-hex-digit group is the only thing that can
+# ever end up in the resulting style="..." attribute -- see
+# ColorSpanInlineProcessor and the filter_style_properties guard in
+# render_article_content, which together mean neither this syntax nor a
+# hand-typed <span style="..."> can carry anything beyond a colour value.
+COLOR_RE = r"\{color:(#[0-9a-fA-F]{6})\}(.*?)\{/color\}"
+BACKGROUND_COLOR_RE = r"\{bg:(#[0-9a-fA-F]{6})\}(.*?)\{/bg\}"
 
 _INTERNAL_LINK_CLASSES = {"wiki-link", "wiki-link-missing", "wiki-link-archived"}
 
@@ -116,8 +124,14 @@ SANITIZE_ATTRIBUTES = {
         "data-attachment-id",
     },
     "img": {"src", "alt", "title", "data-image-id"},
+    "span": {"style"},
     **{f"h{level}": {"id"} for level in range(1, 7)},
 }
+# Even though this feeds our own generated markup, nh3 does not validate
+# CSS *values* -- restricting the property names is what actually keeps a
+# hand-typed <span style="..."> in the source from carrying anything more
+# dangerous than a colour (no url(), no position, etc.).
+SANITIZE_STYLE_PROPERTIES = {"color", "background-color"}
 SANITIZE_CLASSES = {
     "a": _INTERNAL_LINK_CLASSES | {"external-link", "attachment-link"},
     "span": {"wiki-link-missing"},
@@ -247,6 +261,24 @@ class AttachmentEmbedInlineProcessor(InlineProcessor):
         return anchor, m.start(0), m.end(0)
 
 
+class ColorSpanInlineProcessor(InlineProcessor):
+    """``{color:#RRGGBB}text{/color}`` / ``{bg:#RRGGBB}text{/bg}`` -- the
+    WYSIWYG editor's font-colour and text-highlight buttons. One class
+    handles both; which CSS property it writes is fixed per registered
+    instance (see CorporateWikiExtension), not taken from the match.
+    """
+
+    def __init__(self, pattern, md, css_property):
+        super().__init__(pattern, md)
+        self._css_property = css_property
+
+    def handleMatch(self, m, data):
+        span = etree.Element("span")
+        span.set("style", f"{self._css_property}: {m.group(1)};")
+        span.text = m.group(2)
+        return span, m.start(0), m.end(0)
+
+
 class ExternalLinkTreeprocessor(Treeprocessor):
     """Marks plain ``[text](url)`` links to other domains as external."""
 
@@ -285,6 +317,14 @@ class CorporateWikiExtension(Extension):
         )
         md.inlinePatterns.register(
             SimpleTagInlineProcessor(STRIKETHROUGH_RE, "del"), "strikethrough", 170
+        )
+        md.inlinePatterns.register(
+            ColorSpanInlineProcessor(COLOR_RE, md, "color"), "text_color", 169
+        )
+        md.inlinePatterns.register(
+            ColorSpanInlineProcessor(BACKGROUND_COLOR_RE, md, "background-color"),
+            "text_background",
+            168,
         )
         md.treeprocessors.register(ExternalLinkTreeprocessor(md), "external_links", 4)
 
@@ -326,6 +366,7 @@ def render_article_content(source: str) -> tuple[str, str]:
         attributes=SANITIZE_ATTRIBUTES,
         allowed_classes=SANITIZE_CLASSES,
         url_schemes=SANITIZE_URL_SCHEMES,
+        filter_style_properties=SANITIZE_STYLE_PROPERTIES,
     )
     toc_html = nh3.clean(
         _build_toc_html(md.toc_tokens),

@@ -52,7 +52,7 @@
     // leading backslash before these as a literal escape, so round-tripping
     // arbitrary user text (which knows nothing about Markdown) stays exact.
     function escapeInlineText(text) {
-        return text.replace(/([\\`*_~[\]])/g, "\\$1");
+        return text.replace(/([\\`*_~[\]{}])/g, "\\$1");
     }
 
     // Escapes markers that are only special at the very start of a line
@@ -117,6 +117,19 @@
                 case "a":
                     out += serializeLink(child);
                     break;
+                case "span": {
+                    var inner = serializeInline(child);
+                    var color = colorToHex(child.style.color);
+                    var background = colorToHex(child.style.backgroundColor);
+                    if (color) {
+                        inner = "{color:" + color + "}" + inner + "{/color}";
+                    }
+                    if (background) {
+                        inner = "{bg:" + background + "}" + inner + "{/bg}";
+                    }
+                    out += inner;
+                    break;
+                }
                 default:
                     // Unknown inline wrapper (e.g. a stray <span>) — keep
                     // its content rather than silently dropping it.
@@ -124,6 +137,35 @@
             }
         });
         return out;
+    }
+
+    // Keep in sync with COLOR_RE/BACKGROUND_COLOR_RE in
+    // apps/articles/markdown_ext.py, which only ever accepts a six-digit
+    // hex value -- normalizes whatever the browser reports for
+    // style.color/backgroundColor (hex or "rgb(r, g, b)", depending on
+    // engine) into that exact format. Returns null for anything else
+    // (including "" when no colour is set), so a plain <span> with no
+    // colour styling is left alone by the two callers above.
+    function colorToHex(value) {
+        if (!value) {
+            return null;
+        }
+        var hexMatch = /^#([0-9a-f]{6})$/i.exec(value.trim());
+        if (hexMatch) {
+            return "#" + hexMatch[1].toLowerCase();
+        }
+        var rgbMatch = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(value.trim());
+        if (!rgbMatch) {
+            return null;
+        }
+        return (
+            "#" +
+            [1, 2, 3]
+                .map(function (i) {
+                    return Number(rgbMatch[i]).toString(16).padStart(2, "0");
+                })
+                .join("")
+        );
     }
 
     // Matches the "\U0001f4ce " (📎) prefix AttachmentEmbedInlineProcessor
@@ -1183,6 +1225,329 @@
     }
 
     /* ------------------------------------------------------------------
+     * Table insertion (rows x columns panel) and per-table mini-toolbar
+     * (add/remove row/column, delete table)
+     * ------------------------------------------------------------------ */
+
+    function buildTable(rows, cols) {
+        var table = document.createElement("table");
+        var thead = document.createElement("thead");
+        var headRow = document.createElement("tr");
+        for (var c = 0; c < cols; c++) {
+            headRow.appendChild(document.createElement("th"));
+        }
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement("tbody");
+        for (var r = 1; r < rows; r++) {
+            var row = document.createElement("tr");
+            for (var c2 = 0; c2 < cols; c2++) {
+                row.appendChild(document.createElement("td"));
+            }
+            tbody.appendChild(row);
+        }
+        table.appendChild(tbody);
+        return table;
+    }
+
+    function wireTableInsert(form, surface) {
+        var insertButton = form.querySelector("[data-table-insert]");
+        var panel = form.querySelector("[data-table-panel]");
+        if (!insertButton || !panel) {
+            return;
+        }
+        var rowsInput = panel.querySelector("[data-table-rows]");
+        var colsInput = panel.querySelector("[data-table-cols]");
+        var confirmButton = panel.querySelector("[data-table-confirm]");
+        var cancelButton = panel.querySelector("[data-table-cancel]");
+        var savedRange = null;
+
+        insertButton.addEventListener("click", function () {
+            var selection = window.getSelection();
+            if (selection && selection.rangeCount > 0 && surface.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+                savedRange = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedRange = null;
+            }
+            panel.hidden = false;
+        });
+
+        if (cancelButton) {
+            cancelButton.addEventListener("click", function () {
+                panel.hidden = true;
+            });
+        }
+
+        if (confirmButton) {
+            confirmButton.addEventListener("click", function () {
+                var rows = Math.min(20, Math.max(1, parseInt(rowsInput.value, 10) || 1));
+                var cols = Math.min(10, Math.max(1, parseInt(colsInput.value, 10) || 1));
+                var table = buildTable(rows, cols);
+                if (savedRange) {
+                    var selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(savedRange);
+                }
+                insertNodeAtSelection(surface, table);
+                panel.hidden = true;
+            });
+        }
+    }
+
+    function tableRows(table) {
+        return Array.prototype.slice.call(table.querySelectorAll("tr"));
+    }
+
+    function cellIndexInRow(cell) {
+        return Array.prototype.indexOf.call(cell.parentNode.children, cell);
+    }
+
+    function addTableRowAfter(table, referenceRow) {
+        var columnCount = referenceRow.children.length;
+        var newRow = document.createElement("tr");
+        for (var i = 0; i < columnCount; i++) {
+            newRow.appendChild(document.createElement("td"));
+        }
+        var isHeaderRow = referenceRow.parentNode.tagName.toLowerCase() === "thead";
+        if (isHeaderRow) {
+            var tbody = table.querySelector("tbody");
+            if (tbody) {
+                tbody.insertBefore(newRow, tbody.firstChild);
+            } else {
+                table.appendChild(newRow);
+            }
+        } else {
+            referenceRow.parentNode.insertBefore(newRow, referenceRow.nextSibling);
+        }
+    }
+
+    function deleteTableRow(table, row) {
+        var rows = tableRows(table);
+        if (rows.length <= 1) {
+            return;
+        }
+        var parent = row.parentNode;
+        row.remove();
+        if (parent.tagName.toLowerCase() === "thead" && !parent.querySelector("tr")) {
+            parent.remove();
+        }
+    }
+
+    function addTableColumnAfter(table, colIndex) {
+        tableRows(table).forEach(function (row) {
+            var isHeaderRow = row.parentNode.tagName.toLowerCase() === "thead";
+            var cell = document.createElement(isHeaderRow ? "th" : "td");
+            var referenceCell = row.children[colIndex];
+            if (referenceCell && referenceCell.nextSibling) {
+                row.insertBefore(cell, referenceCell.nextSibling);
+            } else {
+                row.appendChild(cell);
+            }
+        });
+    }
+
+    function deleteTableColumn(table, colIndex) {
+        var rows = tableRows(table);
+        if (!rows.length || rows[0].children.length <= 1) {
+            return;
+        }
+        rows.forEach(function (row) {
+            var cell = row.children[colIndex];
+            if (cell) {
+                cell.remove();
+            }
+        });
+    }
+
+    function wireTableInteractions(surface) {
+        var miniToolbar = null;
+        var selectedTable = null;
+        var selectedRow = null;
+        var selectedColIndex = 0;
+
+        function removeMiniToolbar() {
+            if (miniToolbar) {
+                miniToolbar.remove();
+                miniToolbar = null;
+            }
+        }
+
+        function deselect() {
+            if (selectedTable) {
+                selectedTable.classList.remove("is-selected");
+            }
+            selectedTable = null;
+            selectedRow = null;
+            removeMiniToolbar();
+        }
+
+        function positionMiniToolbar() {
+            if (!miniToolbar || !selectedTable) {
+                return;
+            }
+            var rect = selectedTable.getBoundingClientRect();
+            miniToolbar.style.left = window.scrollX + rect.left + "px";
+            miniToolbar.style.top = window.scrollY + rect.top - miniToolbar.offsetHeight - 6 + "px";
+        }
+
+        function showMiniToolbar() {
+            removeMiniToolbar();
+            miniToolbar = document.createElement("div");
+            miniToolbar.className = "wysiwyg-table-toolbar";
+            miniToolbar.setAttribute("contenteditable", "false");
+
+            [
+                ["add-row", "Добавить строку"],
+                ["add-col", "Добавить столбец"],
+                ["delete-row", "Удалить строку"],
+                ["delete-col", "Удалить столбец"],
+                ["delete-table", "Удалить таблицу"],
+            ].forEach(function (pair) {
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = pair[1];
+                btn.dataset.tableAction = pair[0];
+                if (pair[0] === "delete-table") {
+                    btn.classList.add("wysiwyg-table-toolbar__danger");
+                }
+                miniToolbar.appendChild(btn);
+            });
+
+            document.body.appendChild(miniToolbar);
+            positionMiniToolbar();
+        }
+
+        function selectCell(cell) {
+            var row = cell.parentNode;
+            var table = cell.closest("table");
+            if (!table || !surface.contains(table)) {
+                return;
+            }
+            if (selectedTable !== table) {
+                deselect();
+                selectedTable = table;
+                selectedTable.classList.add("is-selected");
+            }
+            selectedRow = row;
+            selectedColIndex = cellIndexInRow(cell);
+            showMiniToolbar();
+        }
+
+        surface.addEventListener("mousedown", function (event) {
+            var cell = event.target.closest("td, th");
+            if (cell && surface.contains(cell)) {
+                selectCell(cell);
+            } else if (!event.target.closest(".wysiwyg-table-toolbar")) {
+                deselect();
+            }
+        });
+
+        document.addEventListener("mousedown", function (event) {
+            if (
+                selectedTable &&
+                !event.target.closest("table") &&
+                !event.target.closest(".wysiwyg-table-toolbar")
+            ) {
+                deselect();
+            }
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!miniToolbar) {
+                return;
+            }
+            var button = event.target.closest("[data-table-action]");
+            if (!button || !miniToolbar.contains(button) || !selectedTable || !selectedRow) {
+                return;
+            }
+            var action = button.dataset.tableAction;
+            if (action === "add-row") {
+                addTableRowAfter(selectedTable, selectedRow);
+                positionMiniToolbar();
+            } else if (action === "add-col") {
+                addTableColumnAfter(selectedTable, selectedColIndex);
+                positionMiniToolbar();
+            } else if (action === "delete-row") {
+                deleteTableRow(selectedTable, selectedRow);
+                deselect();
+            } else if (action === "delete-col") {
+                deleteTableColumn(selectedTable, selectedColIndex);
+                deselect();
+            } else if (action === "delete-table") {
+                var table = selectedTable;
+                deselect();
+                table.remove();
+            }
+        });
+
+        window.addEventListener(
+            "scroll",
+            function () {
+                positionMiniToolbar();
+            },
+            true
+        );
+        window.addEventListener("resize", positionMiniToolbar);
+    }
+
+    /* ------------------------------------------------------------------
+     * Font colour / text highlight: native <input type="color"> pickers.
+     * Opening the native picker steals focus from the contenteditable
+     * surface asynchronously, so the selection is captured on mousedown
+     * (before that happens) and restored once a colour is actually
+     * picked -- the same pattern wireImageUpload uses for its file
+     * dialog.
+     * ------------------------------------------------------------------ */
+
+    function wireColorPickers(surface, toolbar) {
+        var savedRange = null;
+
+        function captureSelection() {
+            var selection = window.getSelection();
+            if (
+                selection &&
+                selection.rangeCount > 0 &&
+                surface.contains(selection.getRangeAt(0).commonAncestorContainer) &&
+                !selection.getRangeAt(0).collapsed
+            ) {
+                savedRange = selection.getRangeAt(0).cloneRange();
+            } else {
+                savedRange = null;
+            }
+        }
+
+        function applyColor(cssProperty, value) {
+            if (!savedRange) {
+                return;
+            }
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(savedRange);
+            var span = document.createElement("span");
+            span.style[cssProperty] = value;
+            wrapRangeWithElement(savedRange, span);
+            selection.removeAllRanges();
+            var next = document.createRange();
+            next.selectNodeContents(span);
+            next.collapse(false);
+            selection.addRange(next);
+            savedRange = null;
+        }
+
+        toolbar.querySelectorAll("[data-color-picker]").forEach(function (input) {
+            input.addEventListener("mousedown", captureSelection);
+            input.addEventListener("input", function () {
+                if (!savedRange) {
+                    window.alert("Сначала выделите текст.");
+                    return;
+                }
+                applyColor(input.getAttribute("data-color-picker"), input.value);
+            });
+        });
+    }
+
+    /* ------------------------------------------------------------------
      * Wiki-link hints: underline words matching an existing article title
      * with a small clickable "make this a link" button.
      * ------------------------------------------------------------------ */
@@ -1379,6 +1744,12 @@
         wireImageUpload(form, surface);
         wireAttachmentUpload(form, surface);
         wireImageInteractions(surface);
+        wireTableInsert(form, surface);
+        wireTableInteractions(surface);
+        var toolbarEl = surface.parentNode.querySelector(".wysiwyg-toolbar");
+        if (toolbarEl) {
+            wireColorPickers(surface, toolbarEl);
+        }
         wirePasteSanitizer(surface);
         hints = wireWikiLinkHints(surface, articlesRef);
         wireFormSubmit(form, surface);

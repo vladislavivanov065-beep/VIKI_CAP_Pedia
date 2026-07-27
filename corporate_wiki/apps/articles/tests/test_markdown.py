@@ -329,3 +329,44 @@ def test_attachment_embed_does_not_collide_with_wikilink_title_syntax():
     # accidentally parsed as a wikilink titled "attachment:not-a-uuid".
     html, _toc = render_article_content("[[attachment:not-a-uuid]]")
     assert "вложение не найдено" in html
+
+
+def test_text_color_renders_as_span_with_style():
+    html, _toc = render_article_content("{color:#ff0000}красный{/color}")
+    assert '<span style="color:#ff0000">красный</span>' in html
+
+
+def test_text_background_renders_as_span_with_style():
+    html, _toc = render_article_content("{bg:#ffff00}выделено{/bg}")
+    assert '<span style="background-color:#ffff00">выделено</span>' in html
+
+
+def test_text_color_and_background_can_nest():
+    html, _toc = render_article_content("{bg:#00ff00}{color:#0000ff}вложено{/color}{/bg}")
+    assert '<span style="background-color:#00ff00">' in html
+    assert '<span style="color:#0000ff">вложено</span>' in html
+
+
+def test_text_color_composes_with_other_inline_formatting():
+    html, _toc = render_article_content("{color:#ff0000}**жирный красный**{/color}")
+    assert "<strong>жирный красный</strong>" in html
+    assert 'style="color:#ff0000"' in html
+
+
+def test_text_color_ignores_invalid_hex_value():
+    html, _toc = render_article_content("{color:red}текст{/color}")
+    assert "style=" not in html
+    assert "{color:red}текст{/color}" in html
+
+
+def test_hand_typed_style_attribute_is_restricted_to_color_properties():
+    # Even raw HTML in the source (which Markdown passes through verbatim
+    # before nh3 sanitizes it) can never carry more than a colour value --
+    # filter_style_properties strips everything else regardless of where
+    # the style attribute came from.
+    html, _toc = render_article_content(
+        '<span style="color: red; position: fixed; behavior: url(evil.htc)">x</span>'
+    )
+    assert "position" not in html
+    assert "behavior" not in html
+    assert "color: red" in html or "color:red" in html
