@@ -83,18 +83,32 @@ def retrain_local_ai(request):
         raise PermissionDenied
 
     try:
-        training.retrain_local_model(actor=request.user)
+        training.start_retrain_in_background(actor=request.user)
     except training.LocalAiAlreadyTrainingError as exc:
         messages.error(request, str(exc))
         return redirect("assistant:local_ai_admin")
 
-    solo = AssistantSettings.get_solo()
-    if solo.local_ai_last_error:
-        messages.error(request, f"Обучение завершилось с ошибкой: {solo.local_ai_last_error}")
-    else:
-        messages.success(
-            request,
-            f"Локальный ИИ обучен на {solo.local_ai_article_count} статьях "
-            f"({solo.local_ai_chunk_count} фрагментов).",
-        )
+    messages.success(request, "Обучение запущено — прогресс отображается на этой странице.")
     return redirect("assistant:local_ai_admin")
+
+
+def local_ai_status(request):
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    solo = AssistantSettings.get_solo()
+    return JsonResponse(
+        {
+            "is_training": solo.local_ai_is_training,
+            "log": solo.local_ai_log,
+            "trained_at": (
+                solo.local_ai_trained_at.isoformat() if solo.local_ai_trained_at else None
+            ),
+            "trained_by": (
+                solo.local_ai_trained_by.display_name if solo.local_ai_trained_by else None
+            ),
+            "article_count": solo.local_ai_article_count,
+            "chunk_count": solo.local_ai_chunk_count,
+            "last_error": solo.local_ai_last_error,
+        }
+    )

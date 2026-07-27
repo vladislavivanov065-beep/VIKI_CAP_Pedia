@@ -502,6 +502,20 @@ a.link-missing {
     margin-top: 0.6rem;
 }
 
+.local-ai-log {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 1rem 0;
+    padding: 0.75rem;
+    background: var(--background-page);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .assistant-toggle__label {
     display: flex;
     align-items: center;

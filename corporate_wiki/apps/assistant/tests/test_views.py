@@ -280,7 +280,8 @@ def test_retrain_requires_staff(client, monkeypatch):
     client.force_login(user)
     called = []
     monkeypatch.setattr(
-        "apps.assistant.views.training.retrain_local_model", lambda **kw: called.append(kw)
+        "apps.assistant.views.training.start_retrain_in_background",
+        lambda **kw: called.append(kw),
     )
 
     response = client.post(reverse("assistant:retrain_local_ai"))
@@ -297,12 +298,12 @@ def test_retrain_requires_post(client):
     assert response.status_code == 405
 
 
-def test_retrain_calls_training_and_redirects(client, monkeypatch):
+def test_retrain_starts_background_training_and_redirects(client, monkeypatch):
     admin = UserFactory(must_change_password=False, is_staff=True)
     client.force_login(admin)
     called = []
     monkeypatch.setattr(
-        "apps.assistant.views.training.retrain_local_model",
+        "apps.assistant.views.training.start_retrain_in_background",
         lambda **kw: called.append(kw),
     )
 
@@ -322,9 +323,57 @@ def test_retrain_reports_already_training_without_crashing(client, monkeypatch):
     def _raise(**kwargs):
         raise training.LocalAiAlreadyTrainingError("Обучение уже выполняется.")
 
-    monkeypatch.setattr("apps.assistant.views.training.retrain_local_model", _raise)
+    monkeypatch.setattr("apps.assistant.views.training.start_retrain_in_background", _raise)
 
     response = client.post(reverse("assistant:retrain_local_ai"))
 
     assert response.status_code == 302
     assert response.url == reverse("assistant:local_ai_admin")
+
+
+def test_local_ai_status_requires_authentication(client):
+    response = client.get(reverse("assistant:local_ai_status"))
+    assert response.status_code == 302
+
+
+def test_local_ai_status_requires_staff(client):
+    user = UserFactory(must_change_password=False, is_staff=False)
+    client.force_login(user)
+
+    response = client.get(reverse("assistant:local_ai_status"))
+
+    assert response.status_code == 403
+
+
+def test_local_ai_status_reports_untrained_state(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.get(reverse("assistant:local_ai_status"))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "is_training": False,
+        "log": "",
+        "trained_at": None,
+        "trained_by": None,
+        "article_count": 0,
+        "chunk_count": 0,
+        "last_error": "",
+    }
+
+
+def test_local_ai_status_reports_training_progress(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    solo = AssistantSettings.get_solo()
+    solo.local_ai_is_training = True
+    solo.local_ai_log = "[12:00:00] Начало обучения…"
+    solo.save(update_fields=["local_ai_is_training", "local_ai_log"])
+
+    response = client.get(reverse("assistant:local_ai_status"))
+
+    body = response.json()
+    assert body["is_training"] is True
+    assert body["log"] == "[12:00:00] Начало обучения…"
