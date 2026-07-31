@@ -13,18 +13,22 @@ pytestmark = pytest.mark.django_db
 
 
 def _fake_embed_texts(texts):
-    """Distinct texts get orthogonal vectors (cosine similarity 0),
-    identical texts get identical vectors (similarity 1) -- deterministic,
-    and keeps apps.assistant.chunking's semantic-merge threshold from
-    firing on unrelated fake text, so these tests' chunk boundaries are
-    governed by the "no terminal punctuation" heuristic alone unless a
-    test is specifically about semantic merging.
+    """Distinct texts get orthogonal vectors (cosine similarity 0, below
+    apps.assistant.chunking's merge thresholds), identical texts get
+    identical vectors (similarity 1) -- deterministic, and keeps
+    unrelated fake text from spuriously merging in these tests unless a
+    test specifically supplies its own similarity-bearing fake (e.g. the
+    address-block test below).
     """
     unique_texts = list(dict.fromkeys(texts))
     vectors = np.zeros((len(texts), max(len(unique_texts), 1)), dtype=np.float32)
     for row, text in enumerate(texts):
         vectors[row, unique_texts.index(text)] = 1.0
     return vectors
+
+
+def _same_vector_fake_embed_texts(texts):
+    return np.ones((len(texts), 3), dtype=np.float32)
 
 
 def test_retrain_creates_chunk_embeddings_for_all_articles(monkeypatch):
@@ -218,12 +222,34 @@ def test_chunk_text_returns_one_row_per_block(monkeypatch):
 
 
 def test_chunk_text_merges_a_multi_line_address_into_one_block(monkeypatch):
-    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    # A real embedding model would recognize these four lines as related
+    # (all part of the same address); the fake stands in for that with
+    # matching vectors, since neither line ends in punctuation but that
+    # alone is no longer enough to merge them (see apps.assistant.chunking).
+    monkeypatch.setattr(
+        "apps.assistant.training.local_models.embed_texts", _same_vector_fake_embed_texts
+    )
     text = "биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"
 
     chunks = training._chunk_text(text)
 
     assert chunks == ["биллинг адрес улица такая-то город такой то пос код такой то"]
+
+
+def test_chunk_text_does_not_merge_unrelated_lines_lacking_punctuation(monkeypatch):
+    def fake_embed_texts(texts):
+        vectors = {
+            "заголовок раздела без точки": [1.0, 0.0],
+            "совсем другой раздел тоже без точки": [0.0, 1.0],
+        }
+        return np.array([vectors[t] for t in texts], dtype=np.float32)
+
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", fake_embed_texts)
+    text = "заголовок раздела без точки\nсовсем другой раздел тоже без точки"
+
+    chunks = training._chunk_text(text)
+
+    assert chunks == ["заголовок раздела без точки", "совсем другой раздел тоже без точки"]
 
 
 def test_chunk_text_keeps_a_multi_sentence_block_as_one_row():
