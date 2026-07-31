@@ -189,10 +189,10 @@ def test_start_retrain_in_background_raises_synchronously_when_already_training(
         training.start_retrain_in_background(actor=admin)
 
 
-def test_chunk_text_returns_one_row_per_sentence():
+def test_chunk_text_returns_one_row_per_block():
     text = (
-        "Первое предложение тут. "
-        "Что можно оплачивать: рекламу и хостинги, домены, нейросети. "
+        "Первое предложение тут.\n"
+        "Что можно оплачивать: рекламу и хостинги, домены, нейросети.\n"
         "Третье предложение здесь."
     )
 
@@ -205,16 +205,27 @@ def test_chunk_text_returns_one_row_per_sentence():
     ]
 
 
+def test_chunk_text_keeps_a_multi_sentence_block_as_one_row():
+    # Deliberately coarser than one row per grammatical sentence -- see
+    # apps.assistant.training._chunk_text's docstring: this is what keeps
+    # a paragraph introducing a list attached to that list.
+    text = "Первое предложение. Второе предложение того же блока."
+
+    chunks = training._chunk_text(text)
+
+    assert chunks == ["Первое предложение. Второе предложение того же блока."]
+
+
 def test_chunk_text_returns_empty_list_for_empty_text():
     assert training._chunk_text("") == []
 
 
-def test_sync_article_embeddings_creates_a_row_per_sentence(monkeypatch):
+def test_sync_article_embeddings_creates_a_row_per_block(monkeypatch):
     monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
     admin = UserFactory()
     article = article_services.create_article(
         title="Отпуска",
-        content_source="Отпуск оформляется за две недели. Обед начинается в полдень.",
+        content_source="Отпуск оформляется за две недели.\n\nОбед начинается в полдень.",
         created_by=admin,
     )
 

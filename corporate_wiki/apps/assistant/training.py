@@ -25,7 +25,7 @@ from apps.accounts.models import User
 from apps.articles.models import Article
 from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
-from apps.assistant.text_utils import article_plain_text, split_sentences
+from apps.assistant.text_utils import article_plain_text, split_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +38,16 @@ class LocalAiAlreadyTrainingError(Exception):
 
 
 def _chunk_text(text: str) -> list[str]:
-    """One row per sentence, not a grouped multi-sentence chunk: embedding
-    each sentence on its own lets apps.assistant.retrieval match a question
-    directly against the single sentence that answers it, instead of a
-    ~400-character group whose embedding averages several unrelated
-    sentences together (see apps.assistant.local_ai for how the resulting
-    candidates get reranked).
+    """One row per paragraph/heading/list/table block (see
+    apps.assistant.text_utils.article_plain_text and split_blocks) --
+    finer than a ~400-character multi-paragraph group (that diluted an
+    embedding across several unrelated topics), but deliberately coarser
+    than one row per grammatical sentence: a paragraph like "Случаи, при
+    которых возможен овердрафт." followed by a bulleted list of those
+    cases is one answer together, and splitting further on that "."
+    would separate the list from the sentence introducing it.
     """
-    return split_sentences(text)
+    return split_blocks(text)
 
 
 def _log(solo: AssistantSettings, message: str) -> None:
