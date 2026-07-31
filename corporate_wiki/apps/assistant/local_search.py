@@ -1,8 +1,10 @@
 """Finds the article sentences most relevant to a question, without any
 external service. Pure word-overlap scoring (TF-IDF-weighted, lemmatized
-via pymorphy3 to match Russian words across inflected forms) -- no network
-calls, so this always works even when OpenAI isn't configured or has been
-disabled by an administrator.
+via pymorphy3 for Russian words and stemmed via a Porter stemmer for
+English ones, so both match across inflected forms) -- no network calls
+(both run entirely offline, no corpus download), so this always works
+even when OpenAI isn't configured or has been disabled by an
+administrator.
 """
 
 from __future__ import annotations
@@ -14,13 +16,16 @@ import threading
 from collections import Counter
 
 import pymorphy3
+from nltk.stem import PorterStemmer
 
 from apps.assistant.text_utils import split_sentences
 
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
+_CYRILLIC_RE = re.compile(r"[а-яё]", re.IGNORECASE)
 
 _morph: pymorphy3.MorphAnalyzer | None = None
 _morph_lock = threading.Lock()
+_stemmer = PorterStemmer()
 
 # Common short Russian words that carry no distinguishing meaning for
 # matching a question against a sentence.
@@ -196,7 +201,9 @@ def _get_morph() -> pymorphy3.MorphAnalyzer:
 
 @functools.lru_cache(maxsize=20000)
 def _lemma(word: str) -> str:
-    return _get_morph().parse(word)[0].normal_form
+    if _CYRILLIC_RE.search(word):
+        return _get_morph().parse(word)[0].normal_form
+    return _stemmer.stem(word)
 
 
 def _keywords(tokens: list[str]) -> list[str]:

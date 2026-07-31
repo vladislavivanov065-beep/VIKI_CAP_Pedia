@@ -23,9 +23,9 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import local_models
+from apps.assistant import chunking, local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
-from apps.assistant.text_utils import article_plain_text, split_blocks
+from apps.assistant.text_utils import article_plain_text
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +38,15 @@ class LocalAiAlreadyTrainingError(Exception):
 
 
 def _chunk_text(text: str) -> list[str]:
-    """One row per paragraph/heading/list/table block (see
-    apps.assistant.text_utils.article_plain_text and split_blocks) --
-    finer than a ~400-character multi-paragraph group (that diluted an
-    embedding across several unrelated topics), but deliberately coarser
-    than one row per grammatical sentence: a paragraph like "Случаи, при
-    которых возможен овердрафт." followed by a bulleted list of those
-    cases is one answer together, and splitting further on that "."
-    would separate the list from the sentence introducing it.
+    """One row per semantically coherent group of lines (see
+    apps.assistant.chunking.group_into_chunks) -- finer than a
+    ~400-character multi-paragraph group (that diluted an embedding
+    across several unrelated topics), but coarser than one row per
+    physical line: a multi-line block like a billing address, or a
+    paragraph introducing a list, stays one retrievable unit instead of
+    being split apart at every line break.
     """
-    return split_blocks(text)
+    return chunking.group_into_chunks(text)
 
 
 def _log(solo: AssistantSettings, message: str) -> None:
