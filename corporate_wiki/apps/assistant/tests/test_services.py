@@ -208,7 +208,7 @@ def test_answer_question_locally_prefers_trained_local_ai(monkeypatch):
         title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
     )
     monkeypatch.setattr(
-        "apps.assistant.services.local_ai.answer_from_corpus",
+        "apps.assistant.services.local_ai.answer_from_article",
         lambda **_: "Отпуск нужно оформить заранее.",
     )
 
@@ -222,7 +222,7 @@ def test_answer_question_locally_falls_back_when_local_ai_has_nothing(monkeypatc
     article = article_services.create_article(
         title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
     )
-    monkeypatch.setattr("apps.assistant.services.local_ai.answer_from_corpus", lambda **_: None)
+    monkeypatch.setattr("apps.assistant.services.local_ai.answer_from_article", lambda **_: None)
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 

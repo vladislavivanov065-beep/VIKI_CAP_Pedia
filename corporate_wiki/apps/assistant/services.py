@@ -78,16 +78,19 @@ def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
     configured at all.
 
     Prefers the trained local AI (an embedding model that finds the single
-    best-matching sentence across every article, see apps.assistant.local_ai)
-    when an administrator has retrained it at least once. Until then, or if
-    it fails for any reason, falls back to plain word-overlap search over
-    just the current article -- degrading gracefully rather than erroring.
+    best-matching sentence within this article, see apps.assistant.local_ai)
+    when an administrator has retrained it at least once. Scoped to this
+    article only, same as the plain-text fallback below -- a question asked
+    on one article's page should never be answered from a different one.
+    Until trained, or if it fails for any reason, falls back to plain
+    word-overlap search over the current article -- degrading gracefully
+    rather than erroring.
     """
     question = question.strip()
     if not question:
         raise AssistantRequestError("Введите вопрос.")
 
-    smart_answer = local_ai.answer_from_corpus(question=question)
+    smart_answer = local_ai.answer_from_article(question=question, article=article)
     if smart_answer is not None:
         return AnswerResult(answer=smart_answer)
 
