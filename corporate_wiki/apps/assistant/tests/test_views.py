@@ -96,7 +96,11 @@ def test_ask_returns_answer(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"answer": "Ответ на вопрос.", "source": "chatgpt"}
+    assert response.json() == {
+        "answer": "Ответ на вопрос.",
+        "alternatives": [],
+        "source": "chatgpt",
+    }
 
 
 def test_ask_defaults_to_local_search_without_use_chatgpt_flag(client):
