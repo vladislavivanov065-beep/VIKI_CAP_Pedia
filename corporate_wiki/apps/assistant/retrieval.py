@@ -1,6 +1,10 @@
-"""Corpus-wide retrieval over the embeddings built by
-apps.assistant.training.retrain_local_model -- ranks stored article chunks
-by similarity to a question. Embeddings are stored L2-normalized (see
+"""Retrieval over the embeddings built by
+apps.assistant.training.retrain_local_model -- ranks a single article's
+stored chunks by similarity to a question. Scoped to one article, not the
+whole corpus: the "Задай свой вопрос" box lives on a specific article's
+page, and an answer sourced from a *different* article would be
+surprising and out of context there (see apps.assistant.local_ai).
+Embeddings are stored L2-normalized (see
 apps.assistant.local_models.embed_texts), so cosine similarity reduces to
 a plain dot product.
 """
@@ -9,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from apps.articles.models import Article
 from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding
 
@@ -18,10 +23,10 @@ from apps.assistant.models import ArticleChunkEmbedding
 _MIN_SIMILARITY = 0.2
 
 
-def find_relevant_chunks(*, question: str, top_k: int = 1) -> list[ArticleChunkEmbedding]:
-    chunks = list(
-        ArticleChunkEmbedding.objects.filter(article__is_archived=False).select_related("article")
-    )
+def find_relevant_chunks(
+    *, question: str, article: Article, top_k: int = 1
+) -> list[ArticleChunkEmbedding]:
+    chunks = list(ArticleChunkEmbedding.objects.filter(article=article, article__is_archived=False))
     if not chunks:
         return []
 
