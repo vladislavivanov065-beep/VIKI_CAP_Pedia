@@ -1,5 +1,8 @@
+import uuid
+
 import numpy as np
 import pytest
+from django.utils import timezone
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
@@ -204,3 +207,93 @@ def test_chunk_text_returns_one_row_per_sentence():
 
 def test_chunk_text_returns_empty_list_for_empty_text():
     assert training._chunk_text("") == []
+
+
+def test_sync_article_embeddings_creates_a_row_per_sentence(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска",
+        content_source="Отпуск оформляется за две недели. Обед начинается в полдень.",
+        created_by=admin,
+    )
+
+    training.sync_article_embeddings(article)
+
+    assert ArticleChunkEmbedding.objects.filter(article=article).count() == 2
+
+
+def test_sync_article_embeddings_replaces_only_that_articles_rows(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Текст статьи.", created_by=admin
+    )
+    other = article_services.create_article(
+        title="Обед", content_source="Другой текст.", created_by=admin
+    )
+    training.sync_article_embeddings(article)
+    training.sync_article_embeddings(other)
+
+    training.sync_article_embeddings(article)
+
+    assert ArticleChunkEmbedding.objects.filter(article=article).count() == 1
+    assert ArticleChunkEmbedding.objects.filter(article=other).count() == 1
+
+
+def test_sync_article_embeddings_removes_rows_for_an_archived_article(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Текст статьи.", created_by=admin
+    )
+    training.sync_article_embeddings(article)
+    assert ArticleChunkEmbedding.objects.filter(article=article).count() == 1
+
+    article_services.archive_article(article_id=article.pk, actor=admin)
+    article.refresh_from_db()
+    training.sync_article_embeddings(article)
+
+    assert ArticleChunkEmbedding.objects.filter(article=article).count() == 0
+
+
+def test_sync_article_embeddings_leaves_no_rows_for_empty_text(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(title="Пустая", content_source="", created_by=admin)
+
+    training.sync_article_embeddings(article)
+
+    assert ArticleChunkEmbedding.objects.filter(article=article).count() == 0
+
+
+def test_start_sync_article_embeddings_in_background_is_a_noop_before_first_retrain(
+    monkeypatch,
+):
+    monkeypatch.setattr("apps.assistant.training.threading.Thread", _ImmediateThread)
+    called = []
+    monkeypatch.setattr(
+        "apps.assistant.training._run_sync_article_embeddings_in_background",
+        lambda article_id: called.append(article_id),
+    )
+
+    training.start_sync_article_embeddings_in_background(uuid.uuid4())
+
+    assert called == []
+
+
+def test_start_sync_article_embeddings_in_background_runs_after_first_retrain(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.threading.Thread", _ImmediateThread)
+    solo = AssistantSettings.get_solo()
+    solo.local_ai_trained_at = timezone.now()
+    solo.save(update_fields=["local_ai_trained_at"])
+    called = []
+    monkeypatch.setattr(
+        "apps.assistant.training._run_sync_article_embeddings_in_background",
+        lambda article_id: called.append(article_id),
+    )
+    article_id = uuid.uuid4()
+
+    training.start_sync_article_embeddings_in_background(article_id)
+
+    assert called == [article_id]
