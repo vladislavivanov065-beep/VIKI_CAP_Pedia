@@ -13,7 +13,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml /app/
+# Plain "pip install torch" pulls the CUDA build by default, bundling
+# several GB of GPU runtime libraries this image never uses -- the local
+# AI feature (apps.assistant) only ever runs on CPU. Installing the CPU
+# wheel first satisfies the "torch" requirement below without pip fetching
+# the CUDA one instead.
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir .
 
 COPY . /app/

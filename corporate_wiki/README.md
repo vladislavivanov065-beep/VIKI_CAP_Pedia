@@ -44,6 +44,9 @@ docker compose up -d --build
 cp .env.example .env
 python3.12 -m venv .venv
 source .venv/bin/activate
+# torch без этой строки ставит CUDA-сборку (несколько лишних гигабайт) --
+# локальный ИИ (apps.assistant) всегда работает на CPU, GPU не нужен.
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -e ".[dev]"
 
 python manage.py migrate
@@ -74,7 +77,14 @@ python manage.py create_initial_admin
 pytest
 coverage run -m pytest
 coverage report
+ruff check .
+black --check .
+mypy .
 ```
+
+Тот же набор (pytest + ruff + black + mypy) автоматически прогоняется в
+GitHub Actions на каждый push и pull request — см.
+`.github/workflows/ci.yml`.
 
 ## Статика
 
