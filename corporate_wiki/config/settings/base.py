@@ -156,6 +156,13 @@ MAX_ATTACHMENT_SIZE_MB = env.int("MAX_ATTACHMENT_SIZE_MB", default=20)
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
 
+# Comma-separated exact-match terms always redacted (see
+# apps.assistant.redaction) before any article text reaches OpenAI, on top
+# of the pattern-based categories (numbers, links, addresses, countries).
+# For anything a regex can't recognize as sensitive on its own -- an
+# infrastructure/vendor name, an internal project codename, etc.
+LOCAL_AI_REDACTED_TERMS = env("LOCAL_AI_REDACTED_TERMS", default="")
+
 # Local (offline, no OpenAI) answer extraction -- a small self-hosted
 # embedding model finds the single most relevant sentence across every
 # article, from an index built by an administrator ("Переобучить локальный

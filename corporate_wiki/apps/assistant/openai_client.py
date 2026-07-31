@@ -35,3 +35,26 @@ def create_chat_completion(*, system_prompt: str, user_prompt: str) -> str:
     except Exception as exc:
         raise AssistantRequestError(f"Не удалось получить ответ от ИИ: {exc}") from exc
     return response.choices[0].message.content or ""
+
+
+def create_json_chat_completion(*, system_prompt: str, user_prompt: str) -> str:
+    """Same as create_chat_completion, but constrains the model to return
+    a syntactically valid JSON object (OpenAI's JSON mode) -- used where
+    the response needs to be parsed programmatically (see
+    apps.assistant.chunking_remote) rather than shown to a person as-is.
+    """
+    try:
+        response = _client().chat.completions.create(
+            model=settings.OPENAI_CHAT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+    except AssistantNotConfiguredError:
+        raise
+    except Exception as exc:
+        raise AssistantRequestError(f"Не удалось получить ответ от ИИ: {exc}") from exc
+    return response.choices[0].message.content or ""

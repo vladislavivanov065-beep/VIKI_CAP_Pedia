@@ -60,6 +60,50 @@ def test_answer_question_sends_article_text_and_question_to_chat_model(settings,
     assert "Отпуска" in captured["user_prompt"]
 
 
+def test_answer_question_redacts_sensitive_article_text_before_sending_it(settings, monkeypatch):
+    settings.OPENAI_API_KEY = "test-key"
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Тарифы",
+        content_source="Лимит 30,000 в день, страна Singapore, ссылка https://example.com/terms",
+        created_by=user,
+    )
+
+    captured = {}
+
+    def fake_chat(*, system_prompt, user_prompt):
+        captured["user_prompt"] = user_prompt
+        return "ответ"
+
+    monkeypatch.setattr("apps.assistant.openai_client.create_chat_completion", fake_chat)
+
+    services.answer_question(article=article, question="Какой лимит?")
+
+    assert "30,000" not in captured["user_prompt"]
+    assert "Singapore" not in captured["user_prompt"]
+    assert "https://example.com/terms" not in captured["user_prompt"]
+    assert "[XXX1]" in captured["user_prompt"]
+
+
+def test_answer_question_restores_real_values_in_a_placeholder_referencing_answer(
+    settings, monkeypatch
+):
+    settings.OPENAI_API_KEY = "test-key"
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Тарифы", content_source="Лимит 30,000 в день.", created_by=user
+    )
+
+    monkeypatch.setattr(
+        "apps.assistant.openai_client.create_chat_completion",
+        lambda **_: "Лимит составляет [XXX1] в день.",
+    )
+
+    result = services.answer_question(article=article, question="Какой лимит?")
+
+    assert result.answer == "Лимит составляет 30,000 в день."
+
+
 def test_answer_question_truncates_very_long_articles(settings, monkeypatch):
     settings.OPENAI_API_KEY = "test-key"
     user = UserFactory()
