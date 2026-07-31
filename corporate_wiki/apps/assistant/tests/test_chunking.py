@@ -33,7 +33,7 @@ def test_group_into_chunks_merges_related_lines_without_terminal_punctuation(mon
     text = "биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"
 
     assert chunking.group_into_chunks(text) == [
-        "биллинг адрес улица такая-то город такой то пос код такой то"
+        "биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"
     ]
 
 
@@ -86,7 +86,7 @@ def test_group_into_chunks_merges_semantically_similar_lines_even_with_punctuati
     text = "Заголовок раздела про отпуска.\nОн тоже про отпуска и связан с этим разделом."
 
     assert chunking.group_into_chunks(text) == [
-        "Заголовок раздела про отпуска. Он тоже про отпуска и связан с этим разделом."
+        "Заголовок раздела про отпуска.\nОн тоже про отпуска и связан с этим разделом."
     ]
 
 

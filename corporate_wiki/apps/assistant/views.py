@@ -50,7 +50,9 @@ def ask_question(request):
     except AssistantRequestError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
 
-    return JsonResponse({"answer": result.answer, "source": source})
+    return JsonResponse(
+        {"answer": result.answer, "alternatives": result.alternatives, "source": source}
+    )
 
 
 @require_POST

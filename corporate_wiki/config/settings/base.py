@@ -164,6 +164,14 @@ OPENAI_CHAT_MODEL = env("OPENAI_CHAT_MODEL", default="gpt-4o-mini")
 # least once, this mode has no index to search and apps.assistant falls
 # back to plain text search on the current article.
 LOCAL_AI_EMBEDDING_MODEL = env("LOCAL_AI_EMBEDDING_MODEL", default="intfloat/multilingual-e5-small")
+# Reranks the (small) pool of candidates the embedding search returns --
+# looks at the question and a candidate together in one pass, so it judges
+# relevance more precisely than embedding cosine similarity or keyword
+# overlap can (see apps.assistant.local_ai). Also downloaded from Hugging
+# Face on first use, cached under LOCAL_AI_MODEL_CACHE_DIR.
+LOCAL_AI_CROSS_ENCODER_MODEL = env(
+    "LOCAL_AI_CROSS_ENCODER_MODEL", default="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+)
 LOCAL_AI_MODEL_CACHE_DIR = env("LOCAL_AI_MODEL_CACHE_DIR", default="")
 
 # Bootstrap credentials for `manage.py create_initial_admin` only. Never

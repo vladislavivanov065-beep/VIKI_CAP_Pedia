@@ -114,6 +114,10 @@
             </form>
             <div class="ask-question-result" data-ask-question-result hidden>
                 <p class="ask-question-result__answer" data-ask-question-answer></p>
+                <div class="ask-question-result__alternatives" data-ask-question-alternatives hidden>
+                    <p class="ask-question-result__alternatives-label">Возможно, также относится:</p>
+                    <ul class="ask-question-result__alternatives-list" data-ask-question-alternatives-list></ul>
+                </div>
             </div>
             <p class="text-secondary ask-question-form__note" data-ask-question-note{% if assistant_enabled %} hidden{% endif %}>
                 {% if not assistant_enabled %}Запросы к ChatGPT отключены администратором. Ищу ответ в тексте статьи…{% endif %}

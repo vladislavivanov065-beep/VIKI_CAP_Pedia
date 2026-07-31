@@ -2,7 +2,7 @@ import pytest
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
-from apps.assistant import services
+from apps.assistant import local_ai, services
 from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
 from apps.assistant.models import AssistantSettings
 
@@ -209,12 +209,31 @@ def test_answer_question_locally_prefers_trained_local_ai(monkeypatch):
     )
     monkeypatch.setattr(
         "apps.assistant.services.local_ai.answer_from_article",
-        lambda **_: "Отпуск нужно оформить заранее.",
+        lambda **_: local_ai.AnswerFromArticle(text="Отпуск нужно оформить заранее."),
     )
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
     assert result.answer == "Отпуск нужно оформить заранее."
+    assert result.alternatives == []
+
+
+def test_answer_question_locally_passes_through_low_confidence_alternatives(monkeypatch):
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+    monkeypatch.setattr(
+        "apps.assistant.services.local_ai.answer_from_article",
+        lambda **_: local_ai.AnswerFromArticle(
+            text="Отпуск нужно оформить заранее.",
+            alternatives=["Другой вариант.", "Ещё один вариант."],
+        ),
+    )
+
+    result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
+
+    assert result.alternatives == ["Другой вариант.", "Ещё один вариант."]
 
 
 def test_answer_question_locally_falls_back_when_local_ai_has_nothing(monkeypatch):

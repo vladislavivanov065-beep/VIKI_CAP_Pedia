@@ -6,6 +6,8 @@
         var submitButton = form.querySelector("[data-ask-question-submit]");
         var resultBox = container.querySelector("[data-ask-question-result]");
         var answerEl = container.querySelector("[data-ask-question-answer]");
+        var alternativesBox = container.querySelector("[data-ask-question-alternatives]");
+        var alternativesList = container.querySelector("[data-ask-question-alternatives-list]");
         var note = container.querySelector("[data-ask-question-note]");
         var url = form.getAttribute("data-ask-question-url");
         var articleSlug = form.getAttribute("data-article-slug");
@@ -20,11 +22,23 @@
             note.hidden = !text;
         }
 
-        function renderAnswer(answer) {
+        function renderAnswer(answer, alternatives) {
             if (!resultBox || !answerEl) {
                 return;
             }
             answerEl.textContent = answer;
+
+            if (alternativesBox && alternativesList) {
+                alternativesList.innerHTML = "";
+                var items = alternatives || [];
+                items.forEach(function (alternative) {
+                    var li = document.createElement("li");
+                    li.textContent = alternative;
+                    alternativesList.appendChild(li);
+                });
+                alternativesBox.hidden = items.length === 0;
+            }
+
             resultBox.hidden = false;
         }
 
@@ -75,7 +89,7 @@
                         return;
                     }
                     showNote("");
-                    renderAnswer(result.data.answer);
+                    renderAnswer(result.data.answer, result.data.alternatives);
                 })
                 .catch(function () {
                     showNote("Не удалось связаться с сервером. Попробуйте ещё раз.");

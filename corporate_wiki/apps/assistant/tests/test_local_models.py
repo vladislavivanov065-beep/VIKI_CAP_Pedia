@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from apps.assistant import local_models
 
@@ -42,3 +43,37 @@ def test_embed_texts_does_not_prefix_non_e5_models(settings, monkeypatch):
     local_models.embed_texts(["текст"], is_query=True)
 
     assert fake.calls[0] == ["текст"]
+
+
+class _FakeCrossEncoder:
+    def __init__(self):
+        self.calls = []
+
+    def predict(self, pairs, convert_to_numpy=True):
+        self.calls.append(list(pairs))
+        return np.array([0.9, 0.1], dtype=np.float32)
+
+
+def test_score_pairs_pairs_the_question_with_each_candidate(monkeypatch):
+    fake = _FakeCrossEncoder()
+    monkeypatch.setattr(local_models, "_get_cross_encoder_model", lambda: fake)
+
+    scores = local_models.score_pairs(
+        question="Когда оформлять отпуск?",
+        candidates=["Отпуск оформляется за две недели.", "Обед начинается в полдень."],
+    )
+
+    assert fake.calls[0] == [
+        ("Когда оформлять отпуск?", "Отпуск оформляется за две недели."),
+        ("Когда оформлять отпуск?", "Обед начинается в полдень."),
+    ]
+    assert scores == pytest.approx([0.9, 0.1])
+
+
+def test_score_pairs_returns_plain_python_floats(monkeypatch):
+    fake = _FakeCrossEncoder()
+    monkeypatch.setattr(local_models, "_get_cross_encoder_model", lambda: fake)
+
+    scores = local_models.score_pairs(question="Вопрос?", candidates=["А", "Б"])
+
+    assert all(isinstance(score, float) for score in scores)

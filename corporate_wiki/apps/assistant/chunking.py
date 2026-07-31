@@ -72,4 +72,7 @@ def group_into_chunks(text: str) -> list[str]:
         else:
             groups.append([i])
 
-    return [" ".join(lines[i] for i in group) for group in groups]
+    # Joined with a line break, not a space, so a multi-line block like an
+    # address still reads as one when it comes back as an answer (the
+    # answer element has white-space: pre-wrap, see style.css).
+    return ["\n".join(lines[i] for i in group) for group in groups]

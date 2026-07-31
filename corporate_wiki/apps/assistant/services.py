@@ -36,6 +36,10 @@ _SYSTEM_PROMPT = (
 @dataclasses.dataclass
 class AnswerResult:
     answer: str
+    # Populated only by the local AI path, and only when its confidence in
+    # `answer` is low (see apps.assistant.local_ai) -- runner-up candidates
+    # worth showing the user rather than presenting a shaky pick alone.
+    alternatives: list[str] = dataclasses.field(default_factory=list)
 
 
 def is_assistant_enabled() -> bool:
@@ -77,14 +81,14 @@ def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
     AssistantSettings.is_enabled and works even when OPENAI_API_KEY isn't
     configured at all.
 
-    Prefers the trained local AI (an embedding model that finds the single
-    best-matching sentence within this article, see apps.assistant.local_ai)
-    when an administrator has retrained it at least once. Scoped to this
-    article only, same as the plain-text fallback below -- a question asked
-    on one article's page should never be answered from a different one.
-    Until trained, or if it fails for any reason, falls back to plain
-    word-overlap search over the current article -- degrading gracefully
-    rather than erroring.
+    Prefers the trained local AI (embeddings find candidate fragments, a
+    cross-encoder picks the best-matching one within this article, see
+    apps.assistant.local_ai) when an administrator has retrained it at
+    least once. Scoped to this article only, same as the plain-text
+    fallback below -- a question asked on one article's page should never
+    be answered from a different one. Until trained, or if it fails for
+    any reason, falls back to plain word-overlap search over the current
+    article -- degrading gracefully rather than erroring.
     """
     question = question.strip()
     if not question:
@@ -92,7 +96,7 @@ def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
 
     smart_answer = local_ai.answer_from_article(question=question, article=article)
     if smart_answer is not None:
-        return AnswerResult(answer=smart_answer)
+        return AnswerResult(answer=smart_answer.text, alternatives=smart_answer.alternatives)
 
     article_text = article_plain_text(article)
     if not article_text:

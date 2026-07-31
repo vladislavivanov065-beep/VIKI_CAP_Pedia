@@ -233,7 +233,7 @@ def test_chunk_text_merges_a_multi_line_address_into_one_block(monkeypatch):
 
     chunks = training._chunk_text(text)
 
-    assert chunks == ["биллинг адрес улица такая-то город такой то пос код такой то"]
+    assert chunks == ["биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"]
 
 
 def test_chunk_text_does_not_merge_unrelated_lines_lacking_punctuation(monkeypatch):
