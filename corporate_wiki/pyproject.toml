@@ -20,6 +20,7 @@ dependencies = [
     "sentence-transformers>=3.0",
     "pymorphy3>=1.2",
     "pymorphy3-dicts-ru>=2.4",
+    "nltk>=3.9",
 ]
 
 [project.optional-dependencies]

@@ -68,3 +68,26 @@ def test_pick_best_sentence_returns_none_without_keyword_overlap():
     result = local_search.pick_best_sentence(sentences=candidates, question="Когда отпуск?")
 
     assert result is None
+
+
+def test_find_best_sentences_matches_english_words_across_inflection():
+    # "billing" in the question vs "billed"/"bills" in the text -- same
+    # Porter stem, so this should match despite sharing no exact word form.
+    text = "Overdraft fees are billed monthly. Обед начинается в полдень."
+
+    matches = local_search.find_best_sentences(text=text, question="How is billing calculated?")
+
+    assert matches == ["Overdraft fees are billed monthly."]
+
+
+def test_find_best_sentences_matches_within_a_mixed_russian_and_english_sentence():
+    # Each word is lemmatized/stemmed by its own script -- "адрес"/"адреса"
+    # (Russian) and "address"/"addresses" (English) both need to match
+    # their inflected forms in the same sentence.
+    text = "Логи IP address записываются автоматически. Обед начинается в полдень."
+
+    matches = local_search.find_best_sentences(
+        text=text, question="Как записываются логи IP addresses?"
+    )
+
+    assert matches == ["Логи IP address записываются автоматически."]

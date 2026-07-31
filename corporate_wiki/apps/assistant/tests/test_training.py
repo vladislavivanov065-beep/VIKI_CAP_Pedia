@@ -13,7 +13,18 @@ pytestmark = pytest.mark.django_db
 
 
 def _fake_embed_texts(texts):
-    return np.ones((len(texts), 3), dtype=np.float32)
+    """Distinct texts get orthogonal vectors (cosine similarity 0),
+    identical texts get identical vectors (similarity 1) -- deterministic,
+    and keeps apps.assistant.chunking's semantic-merge threshold from
+    firing on unrelated fake text, so these tests' chunk boundaries are
+    governed by the "no terminal punctuation" heuristic alone unless a
+    test is specifically about semantic merging.
+    """
+    unique_texts = list(dict.fromkeys(texts))
+    vectors = np.zeros((len(texts), max(len(unique_texts), 1)), dtype=np.float32)
+    for row, text in enumerate(texts):
+        vectors[row, unique_texts.index(text)] = 1.0
+    return vectors
 
 
 def test_retrain_creates_chunk_embeddings_for_all_articles(monkeypatch):
@@ -189,7 +200,8 @@ def test_start_retrain_in_background_raises_synchronously_when_already_training(
         training.start_retrain_in_background(actor=admin)
 
 
-def test_chunk_text_returns_one_row_per_block():
+def test_chunk_text_returns_one_row_per_block(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
     text = (
         "Первое предложение тут.\n"
         "Что можно оплачивать: рекламу и хостинги, домены, нейросети.\n"
@@ -203,6 +215,15 @@ def test_chunk_text_returns_one_row_per_block():
         "Что можно оплачивать: рекламу и хостинги, домены, нейросети.",
         "Третье предложение здесь.",
     ]
+
+
+def test_chunk_text_merges_a_multi_line_address_into_one_block(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    text = "биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"
+
+    chunks = training._chunk_text(text)
+
+    assert chunks == ["биллинг адрес улица такая-то город такой то пос код такой то"]
 
 
 def test_chunk_text_keeps_a_multi_sentence_block_as_one_row():
