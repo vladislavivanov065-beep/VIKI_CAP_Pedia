@@ -186,30 +186,20 @@ def test_start_retrain_in_background_raises_synchronously_when_already_training(
         training.start_retrain_in_background(actor=admin)
 
 
-def test_chunk_text_never_splits_a_sentence_across_chunks():
+def test_chunk_text_returns_one_row_per_sentence():
     text = (
         "Первое предложение тут. "
         "Что можно оплачивать: рекламу и хостинги, домены, нейросети. "
         "Третье предложение здесь."
     )
 
-    chunks = training._chunk_text(text, chunk_chars=40)
+    chunks = training._chunk_text(text)
 
-    for sentence in [
+    assert chunks == [
         "Первое предложение тут.",
         "Что можно оплачивать: рекламу и хостинги, домены, нейросети.",
         "Третье предложение здесь.",
-    ]:
-        assert any(sentence in chunk for chunk in chunks)
-
-
-def test_chunk_text_keeps_a_single_long_sentence_as_one_chunk():
-    long_sentence = "Слово " * 30 + "тут."
-
-    chunks = training._chunk_text(long_sentence, chunk_chars=20)
-
-    assert len(chunks) == 1
-    assert chunks[0] == long_sentence
+    ]
 
 
 def test_chunk_text_returns_empty_list_for_empty_text():

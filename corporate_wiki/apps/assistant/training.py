@@ -25,13 +25,6 @@ from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
 from apps.assistant.text_utils import article_plain_text, split_sentences
 
-# Chunks are grouped whole sentences, never split mid-sentence, up to this
-# many characters -- small enough that each chunk stays about one topic,
-# so its embedding isn't diluted by unrelated neighbouring sentences and
-# apps.assistant.local_ai's sentence extraction has a focused pool to
-# search within.
-_CHUNK_CHARS = 400
-
 # Keeps local_ai_log from growing without bound across many retrains.
 _MAX_LOG_LINES = 500
 
@@ -40,21 +33,15 @@ class LocalAiAlreadyTrainingError(Exception):
     """Another retrain is already in progress."""
 
 
-def _chunk_text(text: str, *, chunk_chars: int = _CHUNK_CHARS) -> list[str]:
-    sentences = split_sentences(text)
-    chunks: list[str] = []
-    current: list[str] = []
-    current_len = 0
-    for sentence in sentences:
-        if current and current_len + len(sentence) + 1 > chunk_chars:
-            chunks.append(" ".join(current))
-            current = []
-            current_len = 0
-        current.append(sentence)
-        current_len += len(sentence) + 1
-    if current:
-        chunks.append(" ".join(current))
-    return chunks
+def _chunk_text(text: str) -> list[str]:
+    """One row per sentence, not a grouped multi-sentence chunk: embedding
+    each sentence on its own lets apps.assistant.retrieval match a question
+    directly against the single sentence that answers it, instead of a
+    ~400-character group whose embedding averages several unrelated
+    sentences together (see apps.assistant.local_ai for how the resulting
+    candidates get reranked).
+    """
+    return split_sentences(text)
 
 
 def _log(solo: AssistantSettings, message: str) -> None:
