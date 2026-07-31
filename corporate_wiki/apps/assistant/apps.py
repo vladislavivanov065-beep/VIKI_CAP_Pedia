@@ -6,3 +6,6 @@ class AssistantConfig(AppConfig):
     name = "apps.assistant"
     label = "assistant"
     verbose_name = "ИИ-ассистент"
+
+    def ready(self):
+        from apps.assistant import signals  # noqa: F401

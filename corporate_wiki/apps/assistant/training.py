@@ -13,7 +13,9 @@ apps.assistant.views.local_ai_status).
 
 from __future__ import annotations
 
+import logging
 import threading
+import uuid
 
 import numpy as np
 from django.db import close_old_connections, transaction
@@ -25,12 +27,7 @@ from apps.assistant import local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
 from apps.assistant.text_utils import article_plain_text, split_sentences
 
-# Chunks are grouped whole sentences, never split mid-sentence, up to this
-# many characters -- small enough that each chunk stays about one topic,
-# so its embedding isn't diluted by unrelated neighbouring sentences and
-# apps.assistant.local_ai's sentence extraction has a focused pool to
-# search within.
-_CHUNK_CHARS = 400
+logger = logging.getLogger(__name__)
 
 # Keeps local_ai_log from growing without bound across many retrains.
 _MAX_LOG_LINES = 500
@@ -40,21 +37,15 @@ class LocalAiAlreadyTrainingError(Exception):
     """Another retrain is already in progress."""
 
 
-def _chunk_text(text: str, *, chunk_chars: int = _CHUNK_CHARS) -> list[str]:
-    sentences = split_sentences(text)
-    chunks: list[str] = []
-    current: list[str] = []
-    current_len = 0
-    for sentence in sentences:
-        if current and current_len + len(sentence) + 1 > chunk_chars:
-            chunks.append(" ".join(current))
-            current = []
-            current_len = 0
-        current.append(sentence)
-        current_len += len(sentence) + 1
-    if current:
-        chunks.append(" ".join(current))
-    return chunks
+def _chunk_text(text: str) -> list[str]:
+    """One row per sentence, not a grouped multi-sentence chunk: embedding
+    each sentence on its own lets apps.assistant.retrieval match a question
+    directly against the single sentence that answers it, instead of a
+    ~400-character group whose embedding averages several unrelated
+    sentences together (see apps.assistant.local_ai for how the resulting
+    candidates get reranked).
+    """
+    return split_sentences(text)
 
 
 def _log(solo: AssistantSettings, message: str) -> None:
@@ -170,3 +161,59 @@ def start_retrain_in_background(*, actor: User) -> None:
     """
     solo = _begin()
     threading.Thread(target=_run_in_background, args=(actor, solo), daemon=True).start()
+
+
+def sync_article_embeddings(article: Article) -> None:
+    """Recomputes just this one article's sentence embeddings in place --
+    called automatically after every save (see apps.assistant.signals) so
+    an edit is searchable right away, without an admin having to click
+    "Переобучить" for it. A full retrain is still needed after switching
+    LOCAL_AI_EMBEDDING_MODEL (the whole index is in the old model's vector
+    space) or to backfill articles that existed before this ever ran.
+
+    An archived article (or one with no text) ends up with no rows, same
+    as a full retrain would leave it -- retrieval already excludes
+    archived articles by query, but there is no reason to keep stale
+    embeddings for one around either.
+    """
+    sentences = [] if article.is_archived else _chunk_text(article_plain_text(article))
+    embeddings = (
+        local_models.embed_texts(sentences) if sentences else np.empty((0,), dtype=np.float32)
+    )
+
+    with transaction.atomic():
+        ArticleChunkEmbedding.objects.filter(article=article).delete()
+        ArticleChunkEmbedding.objects.bulk_create(
+            ArticleChunkEmbedding(
+                article=article,
+                chunk_index=index,
+                text=sentence,
+                embedding=embedding.tobytes(),
+            )
+            for index, (sentence, embedding) in enumerate(zip(sentences, embeddings, strict=True))
+        )
+
+
+def _run_sync_article_embeddings_in_background(article_id: uuid.UUID) -> None:
+    try:
+        article = Article.objects.get(pk=article_id)
+        sync_article_embeddings(article)
+    except Article.DoesNotExist:
+        pass
+    except Exception:
+        logger.exception("Local AI incremental sync failed for article %s", article_id)
+    finally:
+        close_old_connections()
+
+
+def start_sync_article_embeddings_in_background(article_id: uuid.UUID) -> None:
+    """No-op until the index has been built at least once -- an install
+    that has never used the local AI feature (never clicked "Переобучить")
+    shouldn't have every article save start downloading/loading an ML
+    model just to maintain an index nobody queries.
+    """
+    if not AssistantSettings.get_solo().local_ai_trained_at:
+        return
+    threading.Thread(
+        target=_run_sync_article_embeddings_in_background, args=(article_id,), daemon=True
+    ).start()

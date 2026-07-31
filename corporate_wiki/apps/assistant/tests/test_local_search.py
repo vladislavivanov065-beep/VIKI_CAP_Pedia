@@ -39,3 +39,32 @@ def test_find_best_sentences_returns_empty_for_stopword_only_question():
     text = "Отпуск оформляется за две недели."
 
     assert local_search.find_best_sentences(text=text, question="а и в на") == []
+
+
+def test_find_best_sentences_matches_across_grammatical_case_via_lemmatization():
+    # "рекламу" (accusative) in the question vs "рекламы" (genitive) in the
+    # text -- same lemma "реклама", so this should match despite sharing no
+    # exact word form.
+    text = "Хостинги домены и оплата рекламы разрешены. Обед начинается в полдень."
+
+    matches = local_search.find_best_sentences(text=text, question="Что можно оплачивать: рекламу?")
+
+    assert matches == ["Хостинги домены и оплата рекламы разрешены."]
+
+
+def test_pick_best_sentence_returns_the_lexically_closest_candidate():
+    candidates = ["Обед начинается в полдень.", "Отпуск оформляется за две недели."]
+
+    result = local_search.pick_best_sentence(
+        sentences=candidates, question="Когда оформлять отпуск?"
+    )
+
+    assert result == "Отпуск оформляется за две недели."
+
+
+def test_pick_best_sentence_returns_none_without_keyword_overlap():
+    candidates = ["Обед начинается в полдень.", "Столовая на первом этаже."]
+
+    result = local_search.pick_best_sentence(sentences=candidates, question="Когда отпуск?")
+
+    assert result is None
