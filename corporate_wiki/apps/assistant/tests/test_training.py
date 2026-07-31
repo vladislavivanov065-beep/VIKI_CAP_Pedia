@@ -267,6 +267,26 @@ def test_chunk_text_returns_empty_list_for_empty_text():
     assert training._chunk_text("") == []
 
 
+def test_chunk_text_prefers_chatgpt_chunking_when_available(monkeypatch):
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks",
+        lambda text: ["От ChatGPT."],
+    )
+
+    assert training._chunk_text("Что угодно.") == ["От ChatGPT."]
+
+
+def test_chunk_text_falls_back_to_the_local_heuristic_when_chatgpt_chunking_is_unavailable(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks", lambda text: None
+    )
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+
+    assert training._chunk_text("Локальная строка.") == ["Локальная строка."]
+
+
 def test_sync_article_embeddings_creates_a_row_per_block(monkeypatch):
     monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
     admin = UserFactory()

@@ -6,6 +6,14 @@ viewed already IS the context -- there's no cross-article retrieval, no
 embeddings, and nothing to keep in sync when articles are added or
 edited. OpenAI is only ever called at the moment someone actually asks a
 question, never when an article is created or saved.
+
+The article text is redacted (see apps.assistant.redaction) before it's
+sent to OpenAI -- card BINs, tariffs/limits, links, addresses, and country
+names are replaced with "[XXXn]" placeholders, so that kind of operational
+detail never ends up in a third party's request logs just because someone
+asked a question. The model is instructed to echo a placeholder back
+verbatim if the answer needs to reference that value; restore() then
+swaps it back for the real one before the answer is shown to the user.
 """
 
 from __future__ import annotations
@@ -14,7 +22,7 @@ import dataclasses
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import local_ai, local_search, openai_client
+from apps.assistant import local_ai, local_search, openai_client, redaction
 from apps.assistant.exceptions import AssistantDisabledError, AssistantRequestError
 from apps.assistant.models import AssistantSettings
 from apps.assistant.text_utils import article_plain_text
@@ -29,7 +37,11 @@ _SYSTEM_PROMPT = (
     "на основе текста статьи, приведённого ниже. Если в тексте статьи нет "
     "ответа на вопрос, честно скажи, что не нашёл ответ в этой статье — "
     "не придумывай факты и не используй знания извне. Отвечай кратко и "
-    "по делу, на русском языке."
+    "по делу, на русском языке. В тексте статьи часть данных заменена "
+    "плейсхолдерами вида [XXXn] (числа, ссылки, страны, адреса и т.п.) — "
+    "если ответ должен содержать такое значение, вставь плейсхолдер "
+    "[XXXn] в ответ БУКВАЛЬНО, как он написан в статье, не заменяй его "
+    "текстом и не придумывай, что за ним может скрываться."
 )
 
 
@@ -65,15 +77,17 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
     if not article_text:
         return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
 
-    if len(article_text) > _MAX_ARTICLE_CHARS:
-        article_text = article_text[:_MAX_ARTICLE_CHARS]
+    redacted = redaction.redact(article_text)
+    redacted_text = redacted.text
+    if len(redacted_text) > _MAX_ARTICLE_CHARS:
+        redacted_text = redacted_text[:_MAX_ARTICLE_CHARS]
 
-    user_prompt = f"Статья «{article.title}»:\n\n{article_text}\n\n---\n\nВопрос: {question}"
+    user_prompt = f"Статья «{article.title}»:\n\n{redacted_text}\n\n---\n\nВопрос: {question}"
 
     answer = openai_client.create_chat_completion(
         system_prompt=_SYSTEM_PROMPT, user_prompt=user_prompt
     )
-    return AnswerResult(answer=answer.strip())
+    return AnswerResult(answer=redaction.restore(answer.strip(), redacted.tokens))
 
 
 def answer_question_locally(*, article: Article, question: str) -> AnswerResult:

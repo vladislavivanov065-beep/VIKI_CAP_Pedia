@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import chunking, local_models
+from apps.assistant import chunking, chunking_remote, local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
 from apps.assistant.text_utils import article_plain_text
 
@@ -38,14 +38,23 @@ class LocalAiAlreadyTrainingError(Exception):
 
 
 def _chunk_text(text: str) -> list[str]:
-    """One row per semantically coherent group of lines (see
-    apps.assistant.chunking.group_into_chunks) -- finer than a
+    """One row per semantically coherent group of lines -- finer than a
     ~400-character multi-paragraph group (that diluted an embedding
     across several unrelated topics), but coarser than one row per
     physical line: a multi-line block like a billing address, or a
     paragraph introducing a list, stays one retrievable unit instead of
     being split apart at every line break.
+
+    Prefers ChatGPT's grouping (apps.assistant.chunking_remote) when
+    OpenAI is configured and the assistant is enabled -- it only ever sees
+    redacted line numbers, never the real text (see
+    apps.assistant.redaction) -- and falls back to the local
+    embedding-based heuristic (apps.assistant.chunking) otherwise, same as
+    every other OpenAI-optional path in this app.
     """
+    remote_chunks = chunking_remote.remote_group_into_chunks(text)
+    if remote_chunks is not None:
+        return remote_chunks
     return chunking.group_into_chunks(text)
 
 
