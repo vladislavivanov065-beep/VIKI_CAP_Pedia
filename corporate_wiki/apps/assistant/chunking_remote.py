@@ -3,18 +3,29 @@ an alternative to the local embedding-based heuristic in
 apps.assistant.chunking -- optional, since the whole point of the local AI
 feature is to keep working with no OpenAI configured at all. Used from
 apps.assistant.training, which falls back to the local heuristic whenever
-this returns None (not configured, disabled, request failed, or the
-response didn't validate) -- same degradation pattern as everywhere else
-in this app that talks to OpenAI.
+this returns None (not configured, disabled, request failed) -- same
+degradation pattern as everywhere else in this app that talks to OpenAI.
 
-ChatGPT is only ever asked to *group existing line numbers*, never to
+ChatGPT is only ever asked to *point at existing line numbers*, never to
 reproduce any text itself: the article's lines are numbered locally, sent
 to the model with anything sensitive replaced by a "[XXXn]" placeholder
 (see apps.assistant.redaction) so a card BIN, tariff, or address never
-reaches OpenAI, and the model returns which line numbers belong in each
-fragment. The final fragments are then built directly from the ORIGINAL,
-unredacted lines by index -- there's nothing to "unredact" in the model's
-response, because the real text was never sent to it in the first place.
+reaches OpenAI, and the model returns only the line numbers where a new
+fragment starts. The final fragments are then built directly from the
+ORIGINAL, unredacted lines by slicing between those numbers -- there's
+nothing to "unredact" in the model's response, because the real text was
+never sent to it in the first place.
+
+Deliberately asking for boundary *points*, not a full partition of every
+line into groups: an earlier version asked the model to bucket every line
+number into a group in one JSON response, which meant a single missed or
+duplicated line number anywhere in a long article (150+ lines is a
+realistic size here) invalidated the whole response and silently fell
+back to the local heuristic every time -- a mistake in a handful of
+boundary numbers just shifts a fragment edge slightly instead. There is
+no invalid list of boundary numbers short of them not being numbers at
+all: out-of-range or duplicate values are simply dropped (see
+_clean_boundaries), never treated as a reason to discard everything.
 """
 
 from __future__ import annotations
@@ -35,13 +46,13 @@ _SYSTEM_PROMPT = (
     "Тебе присылают пронумерованные строки одной статьи корпоративной базы "
     "знаний. Часть данных в них заменена плейсхолдерами вида [XXXn] — это "
     "ожидаемо, не пытайся угадать, что за ними скрыто, и не убирай их. "
-    "Раздели строки на смысловые фрагменты: каждый фрагмент — это набор "
-    "ИДУЩИХ ПОДРЯД номеров строк, образующих одну законченную мысль "
-    "(например, абзац и вводимый им список или таблица — один фрагмент, "
-    "а не два). Каждая строка должна попасть ровно в один фрагмент, ни "
-    "одна не пропущена и ни одна не продублирована. "
-    'Ответь ТОЛЬКО json-объектом вида {"groups": [[1], [2, 3, 4], [5]]}, '
-    "без пояснений."
+    "Определи, на каких строках начинается новый смысловой фрагмент — "
+    "например, абзац и вводимый им список или таблица идут одним "
+    "фрагментом, а не двумя, значит строка со списком/таблицей НЕ начинает "
+    "новый фрагмент. Строка 1 всегда начинает первый фрагмент — не "
+    "указывай её. Ответь ТОЛЬКО json-объектом вида "
+    '{"new_fragment_starts": [4, 9, 15]} — номера строк, на которых '
+    "начинается каждый следующий фрагмент, по возрастанию, без пояснений."
 )
 
 
@@ -67,31 +78,31 @@ def remote_group_into_chunks(text: str) -> list[str] | None:
         response = openai_client.create_json_chat_completion(
             system_prompt=_SYSTEM_PROMPT, user_prompt=numbered
         )
-        groups = json.loads(response)["groups"]
+        raw_starts = json.loads(response)["new_fragment_starts"]
     except (AssistantNotConfiguredError, AssistantRequestError):
         return None
     except Exception:
-        logger.exception("ChatGPT chunking response was not usable JSON")
+        logger.exception("ChatGPT chunking response was not usable JSON, falling back")
         return None
 
-    if not _is_valid_partition(groups, total_lines=len(lines)):
-        logger.warning("ChatGPT chunking response failed validation, falling back")
-        return None
+    boundaries = _clean_boundaries(raw_starts, total_lines=len(lines))
+    logger.info("ChatGPT chunking: %d line(s) into %d fragment(s)", len(lines), len(boundaries) + 1)
 
-    ordered_groups = sorted(groups, key=min)
-    return ["\n".join(lines[i - 1] for i in group) for group in ordered_groups]
+    fragment_edges = [1, *boundaries, len(lines) + 1]
+    return [
+        "\n".join(lines[start - 1 : end - 1])
+        for start, end in zip(fragment_edges[:-1], fragment_edges[1:], strict=True)
+    ]
 
 
-def _is_valid_partition(groups: object, *, total_lines: int) -> bool:
-    """Every line 1..total_lines must appear in exactly one group."""
-    if not isinstance(groups, list) or not groups:
-        return False
-    seen: set[int] = set()
-    for group in groups:
-        if not isinstance(group, list) or not group:
-            return False
-        for index in group:
-            if not isinstance(index, int) or not (1 <= index <= total_lines) or index in seen:
-                return False
-            seen.add(index)
-    return seen == set(range(1, total_lines + 1))
+def _clean_boundaries(raw_starts: object, *, total_lines: int) -> list[int]:
+    """Keeps only the in-range, non-duplicate line numbers that could
+    actually start a fragment (2..total_lines -- line 1 always starts the
+    first one). Anything else in the model's response (an out-of-range
+    number, a duplicate, a non-integer) is just dropped rather than
+    treated as a reason to discard the whole response.
+    """
+    if not isinstance(raw_starts, list):
+        return []
+    valid = {start for start in raw_starts if isinstance(start, int) and 2 <= start <= total_lines}
+    return sorted(valid)

@@ -47,7 +47,7 @@ def test_remote_group_into_chunks_builds_fragments_from_the_original_lines(setti
 
     monkeypatch.setattr(
         "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
-        lambda **_: json.dumps({"groups": [[1, 2, 3], [4]]}),
+        lambda **_: json.dumps({"new_fragment_starts": [4]}),
     )
 
     result = chunking_remote.remote_group_into_chunks(text)
@@ -65,7 +65,7 @@ def test_remote_group_into_chunks_never_sends_the_real_sensitive_values(settings
 
     def fake_create_json_chat_completion(*, system_prompt, user_prompt):
         captured["user_prompt"] = user_prompt
-        return json.dumps({"groups": [[1], [2]]})
+        return json.dumps({"new_fragment_starts": [2]})
 
     monkeypatch.setattr(
         "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
@@ -81,19 +81,67 @@ def test_remote_group_into_chunks_never_sends_the_real_sensitive_values(settings
     assert result == ["BIN 493711 Singapore.", "Лимит 30,000 в день."]
 
 
-def test_remote_group_into_chunks_orders_fragments_by_original_position(settings, monkeypatch):
+def test_remote_group_into_chunks_ignores_an_out_of_range_boundary(settings, monkeypatch):
     settings.OPENAI_API_KEY = "test-key"
     text = "Первая строка.\nВторая строка."
 
     monkeypatch.setattr(
         "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
-        # Groups returned out of order -- output must still follow the article.
-        lambda **_: json.dumps({"groups": [[2], [1]]}),
+        lambda **_: json.dumps({"new_fragment_starts": [99]}),
     )
 
     result = chunking_remote.remote_group_into_chunks(text)
 
-    assert result == ["Первая строка.", "Вторая строка."]
+    assert result == ["Первая строка.\nВторая строка."]
+
+
+def test_remote_group_into_chunks_ignores_duplicate_and_non_integer_boundaries(
+    settings, monkeypatch
+):
+    settings.OPENAI_API_KEY = "test-key"
+    text = "Первая строка.\nВторая строка.\nТретья строка."
+
+    monkeypatch.setattr(
+        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
+        lambda **_: json.dumps({"new_fragment_starts": [3, 3, "не число"]}),
+    )
+
+    result = chunking_remote.remote_group_into_chunks(text)
+
+    assert result == ["Первая строка.\nВторая строка.", "Третья строка."]
+
+
+def test_remote_group_into_chunks_never_lets_a_single_bad_boundary_ruin_the_whole_response(
+    settings, monkeypatch
+):
+    # A mostly-correct but slightly sloppy response (duplicate, out of
+    # range, and a stray non-integer mixed in with two good boundaries)
+    # must still produce the two good boundaries, not fall back entirely.
+    settings.OPENAI_API_KEY = "test-key"
+    text = "Строка 1.\nСтрока 2.\nСтрока 3.\nСтрока 4.\nСтрока 5."
+
+    monkeypatch.setattr(
+        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
+        lambda **_: json.dumps({"new_fragment_starts": [3, 3, 99, "oops", 5]}),
+    )
+
+    result = chunking_remote.remote_group_into_chunks(text)
+
+    assert result == ["Строка 1.\nСтрока 2.", "Строка 3.\nСтрока 4.", "Строка 5."]
+
+
+def test_remote_group_into_chunks_falls_back_to_one_fragment_on_an_empty_response(
+    settings, monkeypatch
+):
+    settings.OPENAI_API_KEY = "test-key"
+    text = "Первая строка.\nВторая строка."
+
+    monkeypatch.setattr(
+        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
+        lambda **_: json.dumps({"new_fragment_starts": []}),
+    )
+
+    assert chunking_remote.remote_group_into_chunks(text) == ["Первая строка.\nВторая строка."]
 
 
 def test_remote_group_into_chunks_falls_back_on_invalid_json(settings, monkeypatch):
@@ -101,28 +149,6 @@ def test_remote_group_into_chunks_falls_back_on_invalid_json(settings, monkeypat
     monkeypatch.setattr(
         "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
         lambda **_: "не json",
-    )
-
-    result = chunking_remote.remote_group_into_chunks("Первая строка.\nВторая строка.")
-
-    assert result is None
-
-
-@pytest.mark.parametrize(
-    "groups",
-    [
-        [[1]],  # missing line 2
-        [[1, 2], [2]],  # duplicate line 2
-        [[1, 2, 3]],  # out-of-range line 3
-        [],  # empty
-        [[1], []],  # empty group
-    ],
-)
-def test_remote_group_into_chunks_falls_back_on_an_invalid_partition(settings, monkeypatch, groups):
-    settings.OPENAI_API_KEY = "test-key"
-    monkeypatch.setattr(
-        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
-        lambda **_: json.dumps({"groups": groups}),
     )
 
     result = chunking_remote.remote_group_into_chunks("Первая строка.\nВторая строка.")
