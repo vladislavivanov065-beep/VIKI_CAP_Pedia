@@ -156,6 +156,66 @@ def test_remote_group_into_chunks_falls_back_on_invalid_json(settings, monkeypat
     assert result is None
 
 
+def test_remote_group_into_chunks_caps_an_oversized_fragment(settings, monkeypatch):
+    # The model returns no boundaries at all for a 30-line article -- a
+    # real risk if it judges the whole thing "one topic". No fragment
+    # should end up longer than chunking_remote._MAX_FRAGMENT_LINES.
+    settings.OPENAI_API_KEY = "test-key"
+    lines = [f"Строка {i}." for i in range(1, 31)]
+    text = "\n".join(lines)
+
+    monkeypatch.setattr(
+        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
+        lambda **_: json.dumps({"new_fragment_starts": []}),
+    )
+
+    result = chunking_remote.remote_group_into_chunks(text)
+
+    assert "\n".join(lines) == "\n".join(result)  # nothing lost or reordered
+    assert all(
+        fragment.count("\n") + 1 <= chunking_remote._MAX_FRAGMENT_LINES for fragment in result
+    )
+    assert len(result) > 1
+
+
+def test_remote_group_into_chunks_caps_only_the_oversized_fragment(settings, monkeypatch):
+    # A real boundary from the model in the middle of a long run should
+    # survive capping untouched -- only the still-too-long side gets split
+    # further.
+    settings.OPENAI_API_KEY = "test-key"
+    lines = [f"Строка {i}." for i in range(1, 21)]
+    text = "\n".join(lines)
+
+    monkeypatch.setattr(
+        "apps.assistant.chunking_remote.openai_client.create_json_chat_completion",
+        lambda **_: json.dumps({"new_fragment_starts": [11]}),
+    )
+
+    result = chunking_remote.remote_group_into_chunks(text)
+
+    assert result[0] == "\n".join(lines[:10])
+    assert all(
+        fragment.count("\n") + 1 <= chunking_remote._MAX_FRAGMENT_LINES for fragment in result
+    )
+
+
+def test_cap_fragment_sizes_splits_a_long_run_evenly():
+    result = chunking_remote._cap_fragment_sizes([], total_lines=30)
+
+    assert result == [13, 25]
+
+
+def test_cap_fragment_sizes_leaves_a_short_run_alone():
+    assert chunking_remote._cap_fragment_sizes([], total_lines=5) == []
+
+
+def test_cap_fragment_sizes_keeps_existing_boundaries():
+    result = chunking_remote._cap_fragment_sizes([5, 20], total_lines=40)
+
+    assert 5 in result
+    assert 20 in result
+
+
 def test_remote_group_into_chunks_falls_back_when_the_request_fails(settings, monkeypatch):
     settings.OPENAI_API_KEY = "test-key"
 

@@ -42,17 +42,34 @@ from apps.assistant.text_utils import split_blocks
 
 logger = logging.getLogger(__name__)
 
+# Same ceiling as apps.assistant.chunking's _MAX_GROUP_LINES, and for the
+# same reason: whatever ends up in one fragment is returned to a user
+# asking a question verbatim (see apps.assistant.local_ai), so nothing
+# should be able to lump dozens of lines together into one answer just
+# because the model judged them "one topic". The prompt below already
+# asks for fine-grained splitting, but this is the hard backstop for when
+# it doesn't -- a real risk on a long article, where under-splitting into
+# a handful of large sections is an easy way to satisfy "find where a new
+# fragment starts" without the model ever being wrong about anything.
+_MAX_FRAGMENT_LINES = 12
+
 _SYSTEM_PROMPT = (
     "Тебе присылают пронумерованные строки одной статьи корпоративной базы "
     "знаний. Часть данных в них заменена плейсхолдерами вида [XXXn] — это "
     "ожидаемо, не пытайся угадать, что за ними скрыто, и не убирай их. "
-    "Определи, на каких строках начинается новый смысловой фрагмент — "
-    "например, абзац и вводимый им список или таблица идут одним "
-    "фрагментом, а не двумя, значит строка со списком/таблицей НЕ начинает "
-    "новый фрагмент. Строка 1 всегда начинает первый фрагмент — не "
-    "указывай её. Ответь ТОЛЬКО json-объектом вида "
-    '{"new_fragment_starts": [4, 9, 15]} — номера строк, на которых '
-    "начинается каждый следующий фрагмент, по возрастанию, без пояснений."
+    "Определи, на каких строках начинается новый смысловой фрагмент. По "
+    "умолчанию каждый абзац, заголовок, элемент списка или строка таблицы "
+    "— ОТДЕЛЬНЫЙ фрагмент; объединяй строки в один фрагмент только в "
+    "узком случае, когда одна строка без завершающей мысли (заголовок, "
+    'абзац, оканчивающийся на ":" или без знака препинания вовсе) '
+    "непосредственно вводит следующую за ней — например, абзац и вводимый "
+    "им список или таблица. Не объединяй несколько разных абзацев или "
+    "разделов в один фрагмент просто потому, что они на одну общую тему — "
+    "если это не тот узкий случай, каждый абзац начинает новый фрагмент. "
+    "Строка 1 всегда начинает первый фрагмент — не указывай её. Ответь "
+    'ТОЛЬКО json-объектом вида {"new_fragment_starts": [2, 4, 9, 15]} — '
+    "номера строк, на которых начинается каждый следующий фрагмент, по "
+    "возрастанию, без пояснений."
 )
 
 
@@ -85,7 +102,9 @@ def remote_group_into_chunks(text: str) -> list[str] | None:
         logger.exception("ChatGPT chunking response was not usable JSON, falling back")
         return None
 
-    boundaries = _clean_boundaries(raw_starts, total_lines=len(lines))
+    boundaries = _cap_fragment_sizes(
+        _clean_boundaries(raw_starts, total_lines=len(lines)), total_lines=len(lines)
+    )
     logger.info("ChatGPT chunking: %d line(s) into %d fragment(s)", len(lines), len(boundaries) + 1)
 
     fragment_edges = [1, *boundaries, len(lines) + 1]
@@ -106,3 +125,19 @@ def _clean_boundaries(raw_starts: object, *, total_lines: int) -> list[int]:
         return []
     valid = {start for start in raw_starts if isinstance(start, int) and 2 <= start <= total_lines}
     return sorted(valid)
+
+
+def _cap_fragment_sizes(boundaries: list[int], *, total_lines: int) -> list[int]:
+    """Inserts extra boundaries so no fragment ends up longer than
+    _MAX_FRAGMENT_LINES, regardless of what the model returned -- see the
+    module-level comment on _MAX_FRAGMENT_LINES for why.
+    """
+    edges = [1, *boundaries, total_lines + 1]
+    capped: list[int] = []
+    for start, end in zip(edges[:-1], edges[1:], strict=True):
+        position = start
+        while end - position > _MAX_FRAGMENT_LINES:
+            position += _MAX_FRAGMENT_LINES
+            capped.append(position)
+        capped.append(end)
+    return capped[:-1]  # drop the trailing total_lines + 1 sentinel
