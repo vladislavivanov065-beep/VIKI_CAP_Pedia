@@ -14,11 +14,21 @@ detail never ends up in a third party's request logs just because someone
 asked a question. The model is instructed to echo a placeholder back
 verbatim if the answer needs to reference that value; restore() then
 swaps it back for the real one before the answer is shown to the user.
+
+AnswerResult.answer and .alternatives are always HTML-safe strings, never
+raw text -- the local AI path highlights matched words with a literal
+<mark> tag (see apps.assistant.local_search.highlight_matches), and every
+other path escapes plain text through django.utils.html.escape so the
+result is safe to insert with .innerHTML on the frontend either way (see
+static/js/ask-question.js) without whoever's calling this having to know
+which path produced it.
 """
 
 from __future__ import annotations
 
 import dataclasses
+
+from django.utils.html import escape
 
 from apps.accounts.models import User
 from apps.articles.models import Article
@@ -75,7 +85,9 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
 
     article_text = article_plain_text(article)
     if not article_text:
-        return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
+        return AnswerResult(
+            answer=escape("В этой статье пока нет текста, чтобы ответить на вопрос.")
+        )
 
     redacted = redaction.redact(article_text)
     redacted_text = redacted.text
@@ -87,7 +99,8 @@ def answer_question(*, article: Article, question: str) -> AnswerResult:
     answer = openai_client.create_chat_completion(
         system_prompt=_SYSTEM_PROMPT, user_prompt=user_prompt
     )
-    return AnswerResult(answer=redaction.restore(answer.strip(), redacted.tokens))
+    restored = redaction.restore(answer.strip(), redacted.tokens)
+    return AnswerResult(answer=escape(restored))
 
 
 def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
@@ -110,14 +123,25 @@ def answer_question_locally(*, article: Article, question: str) -> AnswerResult:
 
     smart_answer = local_ai.answer_from_article(question=question, article=article)
     if smart_answer is not None:
-        return AnswerResult(answer=smart_answer.text, alternatives=smart_answer.alternatives)
+        return AnswerResult(
+            answer=local_search.highlight_matches(text=smart_answer.text, question=question),
+            alternatives=[
+                local_search.highlight_matches(text=alternative, question=question)
+                for alternative in smart_answer.alternatives
+            ],
+        )
 
     article_text = article_plain_text(article)
     if not article_text:
-        return AnswerResult(answer="В этой статье пока нет текста, чтобы ответить на вопрос.")
+        return AnswerResult(
+            answer=escape("В этой статье пока нет текста, чтобы ответить на вопрос.")
+        )
 
     matches = local_search.find_best_sentences(text=article_text, question=question)
     if not matches:
-        return AnswerResult(answer="Не удалось найти ответ на этот вопрос в тексте статьи.")
+        return AnswerResult(answer=escape("Не удалось найти ответ на этот вопрос в тексте статьи."))
 
-    return AnswerResult(answer=" ".join(matches))
+    highlighted = [
+        local_search.highlight_matches(text=match, question=question) for match in matches
+    ]
+    return AnswerResult(answer=" ".join(highlighted))

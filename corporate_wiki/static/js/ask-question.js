@@ -23,17 +23,21 @@
         }
 
         function renderAnswer(answer, alternatives) {
+            // The backend always returns HTML-escaped text here, with
+            // matched words wrapped in a literal <mark> tag for the local
+            // AI path (see apps.assistant.services) -- innerHTML is safe
+            // to use because of that, not despite it.
             if (!resultBox || !answerEl) {
                 return;
             }
-            answerEl.textContent = answer;
+            answerEl.innerHTML = answer;
 
             if (alternativesBox && alternativesList) {
                 alternativesList.innerHTML = "";
                 var items = alternatives || [];
                 items.forEach(function (alternative) {
                     var li = document.createElement("li");
-                    li.textContent = alternative;
+                    li.innerHTML = alternative;
                     alternativesList.appendChild(li);
                 });
                 alternativesBox.hidden = items.length === 0;

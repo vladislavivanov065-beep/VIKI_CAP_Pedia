@@ -115,7 +115,9 @@ def test_ask_defaults_to_local_search_without_use_chatgpt_flag(client):
     assert response.status_code == 200
     body = response.json()
     assert body["source"] == "local"
-    assert "Отпуск оформляется за две недели." in body["answer"]
+    # The matched word ("Отпуск") comes back wrapped in a literal <mark>
+    # tag -- see apps.assistant.local_search.highlight_matches.
+    assert body["answer"] == "<mark>Отпуск</mark> оформляется за две недели."
 
 
 def test_ask_local_search_ignores_global_disable(client):

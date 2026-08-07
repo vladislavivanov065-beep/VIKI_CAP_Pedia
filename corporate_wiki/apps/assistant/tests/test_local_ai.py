@@ -171,6 +171,60 @@ def test_answer_from_article_returns_none_on_unexpected_retrieval_error(monkeypa
     assert answer is None
 
 
+def test_answer_from_article_uses_exact_match_as_a_tiebreaker(monkeypatch):
+    # Two candidates score almost identically on the cross-encoder (a
+    # realistic case: embeddings/cross-encoders barely distinguish
+    # "493711" from "493712"), but only one contains the exact BIN from
+    # the question -- that one should win despite its slightly lower raw
+    # score.
+    wrong_bin = _seed_one_sentence(text="BIN 493712 действует в Hong Kong.")
+    right_bin = ArticleChunkEmbedding.objects.create(
+        article=wrong_bin.article,
+        chunk_index=1,
+        text="BIN 493711 действует в Singapore.",
+        embedding=b"\x00" * 12,
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks",
+        lambda **_: [wrong_bin, right_bin],
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.local_models.score_pairs", _fake_score_pairs([0.55, 0.5])
+    )
+
+    answer = local_ai.answer_from_article(
+        question="В какой стране действует BIN 493711?", article=wrong_bin.article
+    )
+
+    assert answer.text == "BIN 493711 действует в Singapore."
+
+
+def test_answer_from_article_exact_match_bonus_does_not_override_a_clear_semantic_winner(
+    monkeypatch,
+):
+    # The bonus is a tiebreaker, not an override -- a candidate with the
+    # exact code but a much lower cross-encoder score should still lose to
+    # a clearly better semantic match without that code.
+    with_code = _seed_one_sentence(text="BIN 493711 упомянут здесь мимоходом.")
+    clearly_better = ArticleChunkEmbedding.objects.create(
+        article=with_code.article,
+        chunk_index=1,
+        text="Лучший ответ на вопрос без кода.",
+        embedding=b"\x00" * 12,
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.retrieval.find_relevant_chunks",
+        lambda **_: [with_code, clearly_better],
+    )
+    monkeypatch.setattr(
+        "apps.assistant.local_ai.local_models.score_pairs", _fake_score_pairs([0.1, 0.9])
+    )
+
+    answer = local_ai.answer_from_article(question="BIN 493711?", article=with_code.article)
+
+    assert answer.text == "Лучший ответ на вопрос без кода."
+
+
 def test_answer_from_article_never_searches_a_different_article(monkeypatch):
     # A local AI index exists (for a *different* article), but the article
     # this question was asked about has no chunks of its own -- must not

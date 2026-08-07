@@ -16,12 +16,21 @@ import threading
 from collections import Counter
 
 import pymorphy3
+from django.utils.html import escape
 from nltk.stem import PorterStemmer
 
 from apps.assistant.text_utils import split_sentences
 
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
 _CYRILLIC_RE = re.compile(r"[а-яё]", re.IGNORECASE)
+# Card BIN / tariff / limit / product-code shaped tokens -- long digit runs
+# or short alphanumeric codes ("493711", "E0000000"), same shapes
+# apps.assistant.redaction treats as sensitive. Embeddings and even a
+# cross-encoder see these as generically "a number", so "493711" and
+# "493712" look almost identical to them -- but that's exactly the
+# distinction that matters for a BIN/tariff lookup, which is what
+# exact_match_bonus below is for.
+_EXACT_MATCH_TOKEN_RE = re.compile(r"\b(?:\d{4,}|[A-Za-z]{1,3}\d[\dA-Za-z]{3,})\b")
 
 _morph: pymorphy3.MorphAnalyzer | None = None
 _morph_lock = threading.Lock()
@@ -244,6 +253,23 @@ def _score_candidates(candidates: list[str], question: str) -> list[float]:
     return scores
 
 
+def _exact_match_tokens(text: str) -> set[str]:
+    return {token.lower() for token in _EXACT_MATCH_TOKEN_RE.findall(text)}
+
+
+def exact_match_bonus(*, question: str, candidates: list[str]) -> list[float]:
+    """1.0 for each candidate that contains, verbatim, a number/code token
+    that also appears in the question; 0.0 otherwise. Meant to be added as
+    a small tiebreaker on top of a semantic ranking score (see
+    apps.assistant.local_ai._rank_candidates), not used as a standalone
+    ranker -- a question with no such token produces no bonus for anyone.
+    """
+    query_tokens = _exact_match_tokens(question)
+    if not query_tokens:
+        return [0.0] * len(candidates)
+    return [1.0 if _exact_match_tokens(c) & query_tokens else 0.0 for c in candidates]
+
+
 def find_best_sentences(*, text: str, question: str, max_sentences: int = 1) -> list[str]:
     """Ranks the article's sentences by TF-IDF overlap with the question's
     keywords and returns the top matches, in their original order. Returns
@@ -275,3 +301,38 @@ def pick_best_sentence(*, sentences: list[str], question: str) -> str | None:
     if best_index is None or scores[best_index] <= 0:
         return None
     return sentences[best_index]
+
+
+def highlight_matches(*, text: str, question: str) -> str:
+    """Wraps every word in `text` that shares a lemma with a non-stopword
+    word in the question in a literal <mark> tag -- so a user can see at a
+    glance why a returned quote was picked, instead of having to reread it
+    looking for the connection themselves.
+
+    Safe against XSS despite returning HTML meant for innerHTML: `text`
+    and `question` both come from article content, never from unescaped
+    user/model input reproduced verbatim (the local AI answer is always an
+    extractive quote from the article itself), but this doesn't rely on
+    that -- every character of `text` is escaped (django.utils.html.escape)
+    before it's placed in the output, individually for each word/glue
+    piece, and the only literal "<"/">" characters in the result are the
+    <mark>/</mark> tags this function adds itself. Same escape-then-mark
+    approach as apps.search.fts.snippet_html, adapted since there's no
+    FTS5 index at the chunk level to generate sentinel-marked snippets.
+    """
+    query_keywords = set(_keywords(_tokenize(question)))
+    if not query_keywords:
+        return escape(text)
+
+    pieces: list[str] = []
+    last_end = 0
+    for match in _WORD_RE.finditer(text):
+        word = match.group(0)
+        pieces.append(escape(text[last_end : match.start()]))
+        if _lemma(word.lower()) in query_keywords:
+            pieces.append(f"<mark>{escape(word)}</mark>")
+        else:
+            pieces.append(escape(word))
+        last_end = match.end()
+    pieces.append(escape(text[last_end:]))
+    return "".join(pieces)

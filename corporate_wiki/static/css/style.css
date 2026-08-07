@@ -537,6 +537,14 @@ a.link-missing {
     margin: 0;
 }
 
+.ask-question-result__answer mark,
+.ask-question-result__alternatives-list mark {
+    background: #fff2a8;
+    color: inherit;
+    padding: 0 0.1em;
+    border-radius: 2px;
+}
+
 .ask-question-result__alternatives {
     margin-top: 0.75rem;
     padding-top: 0.5rem;
