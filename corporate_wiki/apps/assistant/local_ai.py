@@ -51,6 +51,12 @@ _CANDIDATE_POOL_SIZE = 5
 # candidates are surfaced alongside it instead of presenting it alone.
 _LOW_CONFIDENCE_THRESHOLD = 0.5
 _MAX_ALTERNATIVES = 2
+# Added to a candidate's cross-encoder score when it contains, verbatim, a
+# number/code token (BIN, tariff, limit) that also appears in the question
+# -- see local_search.exact_match_bonus. Deliberately small: this is a
+# tiebreaker between semantically similar candidates, not something that
+# should override a clearly better semantic match elsewhere in the pool.
+_EXACT_MATCH_BONUS_WEIGHT = 0.1
 
 
 @dataclasses.dataclass
@@ -80,11 +86,16 @@ def answer_from_article(*, question: str, article: Article) -> AnswerFromArticle
 def _rank_candidates(*, sentences: list[str], question: str) -> AnswerFromArticle:
     try:
         scores = local_models.score_pairs(question=question, candidates=sentences)
-        ranked = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)
+        bonuses = local_search.exact_match_bonus(question=question, candidates=sentences)
+        boosted_scores = [
+            score + bonus * _EXACT_MATCH_BONUS_WEIGHT
+            for score, bonus in zip(scores, bonuses, strict=True)
+        ]
+        ranked = sorted(range(len(sentences)), key=lambda i: boosted_scores[i], reverse=True)
         best_index = ranked[0]
 
         alternatives: list[str] = []
-        if scores[best_index] < _LOW_CONFIDENCE_THRESHOLD:
+        if boosted_scores[best_index] < _LOW_CONFIDENCE_THRESHOLD:
             alternatives = [sentences[i] for i in ranked[1 : 1 + _MAX_ALTERNATIVES]]
         return AnswerFromArticle(text=sentences[best_index], alternatives=alternatives)
     except Exception:

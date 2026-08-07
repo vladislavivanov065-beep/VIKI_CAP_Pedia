@@ -104,6 +104,28 @@ def test_answer_question_restores_real_values_in_a_placeholder_referencing_answe
     assert result.answer == "Лимит составляет 30,000 в день."
 
 
+def test_answer_question_escapes_html_in_the_chat_models_answer(settings, monkeypatch):
+    # The chat model's answer is inserted into the page via innerHTML (see
+    # static/js/ask-question.js) -- it must come back HTML-escaped even
+    # though it isn't highlighted, in case the model ever echoes something
+    # HTML-looking from the article back in its answer.
+    settings.OPENAI_API_KEY = "test-key"
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст статьи", created_by=user
+    )
+    monkeypatch.setattr(
+        "apps.assistant.openai_client.create_chat_completion",
+        lambda **_: "<b>жирный</b> ответ & «кавычки»",
+    )
+
+    result = services.answer_question(article=article, question="Вопрос?")
+
+    assert "<b>" not in result.answer
+    assert "&lt;b&gt;" in result.answer
+    assert "&amp;" in result.answer
+
+
 def test_answer_question_truncates_very_long_articles(settings, monkeypatch):
     settings.OPENAI_API_KEY = "test-key"
     user = UserFactory()
@@ -207,7 +229,9 @@ def test_answer_question_locally_finds_matching_sentence():
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
-    assert "Отпуск оформляется за две недели." in result.answer
+    # The matched word ("Отпуск", sharing a lemma with the question) comes
+    # back wrapped in a literal <mark> tag -- see local_search.highlight_matches.
+    assert result.answer == "<mark>Отпуск</mark> оформляется за две недели."
 
 
 def test_answer_question_locally_returns_canned_reply_when_nothing_matches():
@@ -230,7 +254,7 @@ def test_answer_question_locally_does_not_require_openai_key(settings):
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
-    assert "Отпуск оформляется за две недели." in result.answer
+    assert result.answer == "<mark>Отпуск</mark> оформляется за две недели."
 
 
 def test_answer_question_locally_ignores_global_disable(settings):
@@ -243,7 +267,7 @@ def test_answer_question_locally_ignores_global_disable(settings):
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
-    assert "Отпуск оформляется за две недели." in result.answer
+    assert result.answer == "<mark>Отпуск</mark> оформляется за две недели."
 
 
 def test_answer_question_locally_prefers_trained_local_ai(monkeypatch):
@@ -258,7 +282,7 @@ def test_answer_question_locally_prefers_trained_local_ai(monkeypatch):
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
-    assert result.answer == "Отпуск нужно оформить заранее."
+    assert result.answer == "<mark>Отпуск</mark> нужно оформить заранее."
     assert result.alternatives == []
 
 
@@ -280,6 +304,44 @@ def test_answer_question_locally_passes_through_low_confidence_alternatives(monk
     assert result.alternatives == ["Другой вариант.", "Ещё один вариант."]
 
 
+def test_answer_question_locally_highlights_matching_words_in_alternatives_too(monkeypatch):
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Отпуска", content_source="Отпуск оформляется за две недели.", created_by=user
+    )
+    monkeypatch.setattr(
+        "apps.assistant.services.local_ai.answer_from_article",
+        lambda **_: local_ai.AnswerFromArticle(
+            text="Первый вариант.", alternatives=["Про отпуск не в тему."]
+        ),
+    )
+
+    result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
+
+    assert result.alternatives == ["Про <mark>отпуск</mark> не в тему."]
+
+
+def test_answer_question_locally_escapes_html_from_the_local_ai_candidate(monkeypatch):
+    # An article can legitimately contain "<"/">"/"&" in its text (code
+    # samples, "A < B", "&"); the local AI answer is inserted via
+    # innerHTML (see static/js/ask-question.js), so it must always come
+    # back escaped, matched words or not.
+    user = UserFactory()
+    article = article_services.create_article(
+        title="Статья", content_source="текст статьи", created_by=user
+    )
+    monkeypatch.setattr(
+        "apps.assistant.services.local_ai.answer_from_article",
+        lambda **_: local_ai.AnswerFromArticle(text="<b>жирный</b> текст & «кавычки»"),
+    )
+
+    result = services.answer_question_locally(article=article, question="Вопрос?")
+
+    assert "<b>" not in result.answer
+    assert "&lt;b&gt;" in result.answer
+    assert "&amp;" in result.answer
+
+
 def test_answer_question_locally_falls_back_when_local_ai_has_nothing(monkeypatch):
     user = UserFactory()
     article = article_services.create_article(
@@ -289,4 +351,4 @@ def test_answer_question_locally_falls_back_when_local_ai_has_nothing(monkeypatc
 
     result = services.answer_question_locally(article=article, question="Когда оформлять отпуск?")
 
-    assert "Отпуск оформляется за две недели." in result.answer
+    assert result.answer == "<mark>Отпуск</mark> оформляется за две недели."

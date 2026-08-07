@@ -91,3 +91,65 @@ def test_find_best_sentences_matches_within_a_mixed_russian_and_english_sentence
     )
 
     assert matches == ["Логи IP address записываются автоматически."]
+
+
+def test_exact_match_bonus_is_one_for_a_candidate_containing_the_questions_bin():
+    # Embeddings/cross-encoders barely distinguish "493711" from "493712"
+    # -- both just look like "a number" -- but that distinction matters
+    # for a BIN lookup, so an exact substring match gets flagged here.
+    bonuses = local_search.exact_match_bonus(
+        question="Какой лимит у BIN 493711?",
+        candidates=["BIN 493711 действует в Singapore.", "BIN 493712 действует в Hong Kong."],
+    )
+
+    assert bonuses == [1.0, 0.0]
+
+
+def test_exact_match_bonus_is_zero_without_a_code_in_the_question():
+    bonuses = local_search.exact_match_bonus(
+        question="Какой лимит?", candidates=["Лимит 30000 в день.", "Другой текст."]
+    )
+
+    assert bonuses == [0.0, 0.0]
+
+
+def test_exact_match_bonus_matches_alphanumeric_product_codes_too():
+    bonuses = local_search.exact_match_bonus(
+        question="Что такое код E0000000?",
+        candidates=["Код E0000000 означает успех.", "Код C0000017 означает ошибку."],
+    )
+
+    assert bonuses == [1.0, 0.0]
+
+
+def test_highlight_matches_wraps_a_word_sharing_a_lemma_with_the_question():
+    result = local_search.highlight_matches(
+        text="Отпуск оформляется за две недели.", question="Когда оформлять отпуск?"
+    )
+
+    assert result == "<mark>Отпуск</mark> оформляется за две недели."
+
+
+def test_highlight_matches_returns_escaped_text_unchanged_without_any_match():
+    result = local_search.highlight_matches(text="Обед начинается в полдень.", question="Отпуск?")
+
+    assert result == "Обед начинается в полдень."
+
+
+def test_highlight_matches_escapes_html_metacharacters():
+    result = local_search.highlight_matches(text="<b>жирный</b> & «кавычки»", question="Вопрос?")
+
+    assert "<b>" not in result
+    assert result == "&lt;b&gt;жирный&lt;/b&gt; &amp; «кавычки»"
+
+
+def test_highlight_matches_escapes_html_metacharacters_around_a_highlighted_word():
+    result = local_search.highlight_matches(text="<b>отпуск</b> скоро", question="Когда отпуск?")
+
+    assert result == "&lt;b&gt;<mark>отпуск</mark>&lt;/b&gt; скоро"
+
+
+def test_highlight_matches_returns_escaped_text_for_a_stopword_only_question():
+    result = local_search.highlight_matches(text="<i>текст</i>", question="а и в на")
+
+    assert result == "&lt;i&gt;текст&lt;/i&gt;"
