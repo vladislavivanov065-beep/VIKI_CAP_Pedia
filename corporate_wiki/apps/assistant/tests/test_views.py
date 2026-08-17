@@ -281,6 +281,146 @@ def test_local_ai_admin_shows_status_for_staff(client):
     assert response.status_code == 200
 
 
+def test_local_ai_admin_lists_articles_with_no_chunking_preference_yet(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = article_services.create_article(
+        title="Без решения", content_source="текст", created_by=admin
+    )
+
+    response = client.get(reverse("assistant:local_ai_admin"))
+
+    assert list(response.context["undecided_articles"]) == [article]
+
+
+def test_local_ai_admin_excludes_articles_with_a_recorded_preference(client):
+    from apps.assistant import chunking_preferences
+    from apps.assistant.models import ArticleChunkingMethod
+
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = article_services.create_article(
+        title="Решено", content_source="текст", created_by=admin
+    )
+    chunking_preferences.set_method(
+        article=article, method=ArticleChunkingMethod.LOCAL, actor=admin
+    )
+
+    response = client.get(reverse("assistant:local_ai_admin"))
+
+    assert list(response.context["undecided_articles"]) == []
+
+
+def test_set_article_chunking_method_requires_staff(client):
+    user = UserFactory(must_change_password=False, is_staff=False)
+    client.force_login(user)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=user
+    )
+
+    response = client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": str(article.pk), "method": "chatgpt"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_set_article_chunking_method_requires_post(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.get(reverse("assistant:set_article_chunking_method"))
+
+    assert response.status_code == 405
+
+
+def test_set_article_chunking_method_saves_the_choice_and_redirects(client):
+    from apps.assistant.models import ArticleChunkingMethod, ArticleChunkingPreference
+
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=admin
+    )
+
+    response = client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": str(article.pk), "method": "chatgpt"},
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("assistant:local_ai_admin")
+    preference = ArticleChunkingPreference.objects.get(article=article)
+    assert preference.method == ArticleChunkingMethod.CHATGPT
+    assert preference.updated_by == admin
+
+
+def test_set_article_chunking_method_triggers_an_immediate_resync(client, monkeypatch):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=admin
+    )
+    called = []
+    monkeypatch.setattr(
+        "apps.assistant.views.training.start_sync_article_embeddings_in_background",
+        lambda article_id: called.append(article_id),
+    )
+
+    client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": str(article.pk), "method": "local"},
+    )
+
+    assert called == [article.pk]
+
+
+def test_set_article_chunking_method_rejects_an_unknown_method(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+    article = article_services.create_article(
+        title="Статья", content_source="текст", created_by=admin
+    )
+
+    response = client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": str(article.pk), "method": "carrier-pigeon"},
+    )
+
+    assert response.status_code == 302
+    from apps.assistant.models import ArticleChunkingPreference
+
+    assert not ArticleChunkingPreference.objects.filter(article=article).exists()
+
+
+def test_set_article_chunking_method_rejects_a_malformed_article_id(client):
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": "not-a-uuid", "method": "local"},
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("assistant:local_ai_admin")
+
+
+def test_set_article_chunking_method_404s_for_an_unknown_article(client):
+    import uuid
+
+    admin = UserFactory(must_change_password=False, is_staff=True)
+    client.force_login(admin)
+
+    response = client.post(
+        reverse("assistant:set_article_chunking_method"),
+        {"article_id": str(uuid.uuid4()), "method": "local"},
+    )
+
+    assert response.status_code == 404
+
+
 def test_retrain_requires_staff(client, monkeypatch):
     user = UserFactory(must_change_password=False, is_staff=False)
     client.force_login(user)

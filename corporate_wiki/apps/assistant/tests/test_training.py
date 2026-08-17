@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from apps.accounts.factories import UserFactory
 from apps.articles import services as article_services
-from apps.assistant import training
-from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
+from apps.assistant import chunking_preferences, training
+from apps.assistant.models import ArticleChunkEmbedding, ArticleChunkingMethod, AssistantSettings
 
 pytestmark = pytest.mark.django_db
 
@@ -92,6 +92,31 @@ def test_retrain_replaces_previous_chunks_rather_than_accumulating(monkeypatch):
     training.retrain_local_model(actor=admin)
 
     assert ArticleChunkEmbedding.objects.count() == 1
+
+
+def test_retrain_uses_chatgpt_chunking_only_for_articles_with_that_preference(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    opted_in = article_services.create_article(
+        title="Через ChatGPT", content_source="Что угодно.", created_by=admin
+    )
+    article_services.create_article(
+        title="Локально по умолчанию", content_source="Другой текст.", created_by=admin
+    )
+    chunking_preferences.set_method(
+        article=opted_in, method=ArticleChunkingMethod.CHATGPT, actor=admin
+    )
+
+    calls = []
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks",
+        lambda text: calls.append(text) or ["От ChatGPT."],
+    )
+
+    training.retrain_local_model(actor=admin)
+
+    assert calls == ["Что угодно."]
+    assert ArticleChunkEmbedding.objects.get(article=opted_in).text == "От ChatGPT."
 
 
 def test_retrain_raises_when_already_training():
@@ -212,7 +237,7 @@ def test_chunk_text_returns_one_row_per_block(monkeypatch):
         "Третье предложение здесь."
     )
 
-    chunks = training._chunk_text(text)
+    chunks = training._chunk_text(text, prefer_chatgpt=False)
 
     assert chunks == [
         "Первое предложение тут.",
@@ -231,7 +256,7 @@ def test_chunk_text_merges_a_multi_line_address_into_one_block(monkeypatch):
     )
     text = "биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"
 
-    chunks = training._chunk_text(text)
+    chunks = training._chunk_text(text, prefer_chatgpt=False)
 
     assert chunks == ["биллинг адрес\nулица такая-то\nгород такой то\nпос код такой то"]
 
@@ -247,7 +272,7 @@ def test_chunk_text_does_not_merge_unrelated_lines_lacking_punctuation(monkeypat
     monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", fake_embed_texts)
     text = "заголовок раздела без точки\nсовсем другой раздел тоже без точки"
 
-    chunks = training._chunk_text(text)
+    chunks = training._chunk_text(text, prefer_chatgpt=False)
 
     assert chunks == ["заголовок раздела без точки", "совсем другой раздел тоже без точки"]
 
@@ -258,22 +283,37 @@ def test_chunk_text_keeps_a_multi_sentence_block_as_one_row():
     # a paragraph introducing a list attached to that list.
     text = "Первое предложение. Второе предложение того же блока."
 
-    chunks = training._chunk_text(text)
+    chunks = training._chunk_text(text, prefer_chatgpt=False)
 
     assert chunks == ["Первое предложение. Второе предложение того же блока."]
 
 
 def test_chunk_text_returns_empty_list_for_empty_text():
-    assert training._chunk_text("") == []
+    assert training._chunk_text("", prefer_chatgpt=False) == []
 
 
-def test_chunk_text_prefers_chatgpt_chunking_when_available(monkeypatch):
+def test_chunk_text_never_calls_chatgpt_when_not_preferred(monkeypatch):
+    # The whole point of the per-article preference: an article nobody has
+    # opted in must never trigger an OpenAI call, even if one is
+    # configured and would happily answer.
+    called = []
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks",
+        lambda text: called.append(1),
+    )
+
+    training._chunk_text("Что угодно.", prefer_chatgpt=False)
+
+    assert called == []
+
+
+def test_chunk_text_uses_chatgpt_chunking_when_preferred_and_available(monkeypatch):
     monkeypatch.setattr(
         "apps.assistant.training.chunking_remote.remote_group_into_chunks",
         lambda text: ["От ChatGPT."],
     )
 
-    assert training._chunk_text("Что угодно.") == ["От ChatGPT."]
+    assert training._chunk_text("Что угодно.", prefer_chatgpt=True) == ["От ChatGPT."]
 
 
 def test_chunk_text_falls_back_to_the_local_heuristic_when_chatgpt_chunking_is_unavailable(
@@ -284,7 +324,7 @@ def test_chunk_text_falls_back_to_the_local_heuristic_when_chatgpt_chunking_is_u
     )
     monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
 
-    assert training._chunk_text("Локальная строка.") == ["Локальная строка."]
+    assert training._chunk_text("Локальная строка.", prefer_chatgpt=True) == ["Локальная строка."]
 
 
 def test_sync_article_embeddings_creates_a_row_per_block(monkeypatch):
@@ -317,6 +357,42 @@ def test_sync_article_embeddings_replaces_only_that_articles_rows(monkeypatch):
 
     assert ArticleChunkEmbedding.objects.filter(article=article).count() == 1
     assert ArticleChunkEmbedding.objects.filter(article=other).count() == 1
+
+
+def test_sync_article_embeddings_uses_chatgpt_chunking_when_article_opted_in(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Через ChatGPT", content_source="Что угодно.", created_by=admin
+    )
+    chunking_preferences.set_method(
+        article=article, method=ArticleChunkingMethod.CHATGPT, actor=admin
+    )
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks",
+        lambda text: ["От ChatGPT."],
+    )
+
+    training.sync_article_embeddings(article)
+
+    assert ArticleChunkEmbedding.objects.get(article=article).text == "От ChatGPT."
+
+
+def test_sync_article_embeddings_never_calls_chatgpt_without_an_opt_in(monkeypatch):
+    monkeypatch.setattr("apps.assistant.training.local_models.embed_texts", _fake_embed_texts)
+    admin = UserFactory()
+    article = article_services.create_article(
+        title="Без выбора", content_source="Текст статьи.", created_by=admin
+    )
+    called = []
+    monkeypatch.setattr(
+        "apps.assistant.training.chunking_remote.remote_group_into_chunks",
+        lambda text: called.append(1),
+    )
+
+    training.sync_article_embeddings(article)
+
+    assert called == []
 
 
 def test_sync_article_embeddings_removes_rows_for_an_archived_article(monkeypatch):

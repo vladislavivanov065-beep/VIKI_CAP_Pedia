@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.articles.models import Article
-from apps.assistant import chunking, chunking_remote, local_models
+from apps.assistant import chunking, chunking_preferences, chunking_remote, local_models
 from apps.assistant.models import ArticleChunkEmbedding, AssistantSettings
 from apps.assistant.text_utils import article_plain_text
 
@@ -37,7 +37,7 @@ class LocalAiAlreadyTrainingError(Exception):
     """Another retrain is already in progress."""
 
 
-def _chunk_text(text: str) -> list[str]:
+def _chunk_text(text: str, *, prefer_chatgpt: bool) -> list[str]:
     """One row per semantically coherent group of lines -- finer than a
     ~400-character multi-paragraph group (that diluted an embedding
     across several unrelated topics), but coarser than one row per
@@ -45,16 +45,21 @@ def _chunk_text(text: str) -> list[str]:
     paragraph introducing a list, stays one retrievable unit instead of
     being split apart at every line break.
 
-    Prefers ChatGPT's grouping (apps.assistant.chunking_remote) when
-    OpenAI is configured and the assistant is enabled -- it only ever sees
-    redacted line numbers, never the real text (see
-    apps.assistant.redaction) -- and falls back to the local
-    embedding-based heuristic (apps.assistant.chunking) otherwise, same as
-    every other OpenAI-optional path in this app.
+    Only tries ChatGPT's grouping (apps.assistant.chunking_remote) when
+    prefer_chatgpt is set -- an explicit per-article choice recorded in
+    apps.assistant.models.ArticleChunkingPreference (see
+    apps.assistant.chunking_preferences), defaulting to False for any
+    article nobody has opted in. Chunking never calls OpenAI on its own
+    just because a key happens to be configured; falls back to the local
+    embedding-based heuristic (apps.assistant.chunking) both when
+    prefer_chatgpt is False and when ChatGPT chunking is requested but
+    unavailable (not configured, disabled, request failed -- see
+    remote_group_into_chunks).
     """
-    remote_chunks = chunking_remote.remote_group_into_chunks(text)
-    if remote_chunks is not None:
-        return remote_chunks
+    if prefer_chatgpt:
+        remote_chunks = chunking_remote.remote_group_into_chunks(text)
+        if remote_chunks is not None:
+            return remote_chunks
     return chunking.group_into_chunks(text)
 
 
@@ -88,6 +93,7 @@ def _do_training(*, actor: User, solo: AssistantSettings) -> None:
         _log(solo, "Начало обучения…")
         articles = list(Article.objects.filter(is_archived=False))
         _log(solo, f"Найдено статей: {len(articles)}")
+        chatgpt_article_ids = chunking_preferences.chatgpt_preferred_article_ids(articles)
 
         chunk_rows: list[tuple[Article, int, str]] = []
         for position, article in enumerate(articles, start=1):
@@ -95,7 +101,7 @@ def _do_training(*, actor: User, solo: AssistantSettings) -> None:
             if not text:
                 _log(solo, f"[{position}/{len(articles)}] «{article.title}» — пустая, пропущена")
                 continue
-            article_chunks = _chunk_text(text)
+            article_chunks = _chunk_text(text, prefer_chatgpt=article.id in chatgpt_article_ids)
             for index, chunk in enumerate(article_chunks):
                 chunk_rows.append((article, index, chunk))
             _log(
@@ -186,7 +192,14 @@ def sync_article_embeddings(article: Article) -> None:
     archived articles by query, but there is no reason to keep stale
     embeddings for one around either.
     """
-    sentences = [] if article.is_archived else _chunk_text(article_plain_text(article))
+    sentences = (
+        []
+        if article.is_archived
+        else _chunk_text(
+            article_plain_text(article),
+            prefer_chatgpt=chunking_preferences.prefers_chatgpt(article),
+        )
+    )
     embeddings = (
         local_models.embed_texts(sentences) if sentences else np.empty((0,), dtype=np.float32)
     )
