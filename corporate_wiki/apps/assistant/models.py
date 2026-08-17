@@ -56,6 +56,46 @@ class AssistantSettings(models.Model):
         return obj
 
 
+class ArticleChunkingMethod(models.TextChoices):
+    LOCAL = "local", "Локально"
+    CHATGPT = "chatgpt", "ChatGPT"
+
+
+class ArticleChunkingPreference(models.Model):
+    """Per-article choice of how apps.assistant.training splits this
+    article into fragments for the local AI index -- ChatGPT-assisted
+    (apps.assistant.chunking_remote) or the local embedding heuristic
+    (apps.assistant.chunking).
+
+    No row at all means "not decided yet": apps.assistant.training treats
+    an article with no preference as LOCAL (never silently calls OpenAI
+    for an article nobody has opted in) and apps.assistant.views.
+    local_ai_admin lists exactly those articles for an administrator to
+    review. Once a row exists -- for either method, including an explicit
+    LOCAL choice that just confirms the default -- it's used from then on
+    for both the incremental per-save resync (apps.assistant.signals) and
+    a full "Переобучить", until an administrator changes it again.
+    """
+
+    article = models.OneToOneField(
+        "articles.Article", on_delete=models.CASCADE, related_name="chunking_preference"
+    )
+    method = models.CharField(
+        max_length=10, choices=ArticleChunkingMethod.choices, default=ArticleChunkingMethod.LOCAL
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+
+    class Meta:
+        verbose_name = "способ фрагментации статьи"
+        verbose_name_plural = "способы фрагментации статей"
+
+    def __str__(self) -> str:
+        return f"{self.article_id}: {self.method}"
+
+
 class ArticleChunkEmbedding(models.Model):
     """A chunk of an article's plain text plus its embedding vector.
 

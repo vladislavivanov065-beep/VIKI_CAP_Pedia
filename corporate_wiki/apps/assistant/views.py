@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -10,13 +11,13 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.articles.models import Article
-from apps.assistant import services, training
+from apps.assistant import chunking_preferences, services, training
 from apps.assistant.exceptions import (
     AssistantDisabledError,
     AssistantNotConfiguredError,
     AssistantRequestError,
 )
-from apps.assistant.models import AssistantSettings
+from apps.assistant.models import ArticleChunkingMethod, AssistantSettings
 
 
 @require_POST
@@ -76,7 +77,41 @@ def local_ai_admin(request):
     if not request.user.is_staff:
         raise PermissionDenied
 
-    return render(request, "assistant/local_ai_admin.html", {"solo": AssistantSettings.get_solo()})
+    return render(
+        request,
+        "assistant/local_ai_admin.html",
+        {
+            "solo": AssistantSettings.get_solo(),
+            "undecided_articles": chunking_preferences.undecided_articles(),
+        },
+    )
+
+
+@require_POST
+def set_article_chunking_method(request):
+    if not request.user.is_staff:
+        raise PermissionDenied
+
+    method = request.POST.get("method", "")
+    if method not in ArticleChunkingMethod.values:
+        messages.error(request, "Некорректный способ фрагментации.")
+        return redirect("assistant:local_ai_admin")
+
+    try:
+        article_id = uuid.UUID(request.POST.get("article_id", ""))
+    except ValueError:
+        messages.error(request, "Некорректная статья.")
+        return redirect("assistant:local_ai_admin")
+
+    article = get_object_or_404(Article, pk=article_id)
+    chunking_preferences.set_method(article=article, method=method, actor=request.user)
+    training.start_sync_article_embeddings_in_background(article.pk)
+
+    messages.success(
+        request,
+        f"«{article.title}»: фрагментация — {ArticleChunkingMethod(method).label}.",
+    )
+    return redirect("assistant:local_ai_admin")
 
 
 @require_POST

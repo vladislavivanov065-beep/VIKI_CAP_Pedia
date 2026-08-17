@@ -52,6 +52,38 @@
             </button>
         </form>
     </div>
+
+    <div class="content-card">
+        <h2>Способ фрагментации новых статей</h2>
+        <p class="text-secondary">
+            По умолчанию статья разбивается на фрагменты локально, без ChatGPT — при сохранении
+            и при полном переобучении. Ниже — статьи, для которых способ ещё не выбран явно;
+            выбор запоминается за статьёй навсегда, до следующего изменения здесь.
+        </p>
+
+        {% if undecided_articles %}
+            <ul class="chunking-preference-list">
+                {% for article in undecided_articles %}
+                    <li class="chunking-preference-list__item">
+                        <a href="{% url 'articles:detail' article.slug %}">{{ article.title }}</a>
+                        <form method="post" action="{% url 'assistant:set_article_chunking_method' %}"
+                              class="chunking-preference-list__form">
+                            {% csrf_token %}
+                            <input type="hidden" name="article_id" value="{{ article.pk }}">
+                            <button type="submit" name="method" value="local" class="button button--small">
+                                Локально
+                            </button>
+                            <button type="submit" name="method" value="chatgpt" class="button button--small">
+                                ChatGPT
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">Для всех статей способ фрагментации уже выбран.</p>
+        {% endif %}
+    </div>
 {% endblock %}
 
 {% block extra_scripts %}
