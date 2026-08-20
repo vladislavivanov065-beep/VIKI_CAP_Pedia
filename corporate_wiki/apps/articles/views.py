@@ -16,6 +16,7 @@ from apps.articles.markdown_ext import extract_toc_html
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision, Category, Tag
 from apps.articles.similarity import find_similar_articles
 from apps.attachments.exceptions import InvalidAttachmentError
+from apps.comments import services as comments_services
 
 
 def article_create(request):
@@ -75,6 +76,7 @@ def article_detail(request, slug: str):
     revision = article.current_revision
     toc_html = extract_toc_html(revision.content_html) if revision else ""
     similar_articles = find_similar_articles(article, limit=3) if not article.is_archived else []
+    comment_threads = comments_services.get_comment_threads(article)
 
     return render(
         request,
@@ -85,6 +87,7 @@ def article_detail(request, slug: str):
             "toc_html": toc_html,
             "show_source": request.GET.get("view") == "source",
             "similar_articles": similar_articles,
+            "comment_threads": comment_threads,
         },
     )
 

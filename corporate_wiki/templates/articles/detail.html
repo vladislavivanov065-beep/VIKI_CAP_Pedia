@@ -78,6 +78,62 @@
             </div>
         {% endif %}
     </div>
+
+    <div class="content-card" id="comments">
+        <h2>Комментарии{% if comment_threads %} ({{ comment_threads|length }}){% endif %}</h2>
+
+        {% if comment_threads %}
+            <ul class="comment-list">
+                {% for thread in comment_threads %}
+                    <li class="comment" id="comment-{{ thread.comment.pk }}">
+                        <p class="comment__meta">
+                            <span class="comment__author">{{ thread.comment.author.display_name }}</span>
+                            <span class="comment__date">{{ thread.comment.created_at|date:"d.m.Y H:i" }}</span>
+                        </p>
+                        <p class="comment__text">{{ thread.comment.text|linebreaksbr }}</p>
+
+                        {% if not article.is_archived %}
+                            <details class="comment__reply-toggle">
+                                <summary>Ответить</summary>
+                                <form method="post" action="{% url 'comments:create' slug=article.slug %}" class="comment-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="parent_id" value="{{ thread.comment.pk }}">
+                                    <label for="reply-{{ thread.comment.pk }}" class="visually-hidden">Ваш ответ</label>
+                                    <textarea id="reply-{{ thread.comment.pk }}" name="text" rows="2" required></textarea>
+                                    <button type="submit" class="button button--primary">Ответить</button>
+                                </form>
+                            </details>
+                        {% endif %}
+
+                        {% if thread.replies %}
+                            <ul class="comment-list comment-list--replies">
+                                {% for reply in thread.replies %}
+                                    <li class="comment comment--reply" id="comment-{{ reply.pk }}">
+                                        <p class="comment__meta">
+                                            <span class="comment__author">{{ reply.author.display_name }}</span>
+                                            <span class="comment__date">{{ reply.created_at|date:"d.m.Y H:i" }}</span>
+                                        </p>
+                                        <p class="comment__text">{{ reply.text|linebreaksbr }}</p>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-secondary">Комментариев пока нет.</p>
+        {% endif %}
+
+        {% if not article.is_archived %}
+            <form method="post" action="{% url 'comments:create' slug=article.slug %}" class="comment-form comment-form--new">
+                {% csrf_token %}
+                <label for="comment-text" class="visually-hidden">Оставить комментарий</label>
+                <textarea id="comment-text" name="text" rows="3" placeholder="Оставить комментарий…" required></textarea>
+                <button type="submit" class="button button--primary">Комментировать</button>
+            </form>
+        {% endif %}
+    </div>
 {% endblock %}
 
 {% block content_rail %}

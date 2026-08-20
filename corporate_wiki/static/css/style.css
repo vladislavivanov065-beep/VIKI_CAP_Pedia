@@ -608,6 +608,87 @@ a.link-missing {
 }
 
 /* ---------------------------------------------------------------- */
+/* Comments                                                          */
+/* ---------------------------------------------------------------- */
+
+.comment-list {
+    list-style: none;
+    margin: 0 0 1.5rem;
+    padding: 0;
+}
+
+.comment {
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.comment-list--replies {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+}
+
+/* "Чуть правее смещён" -- a reply sits directly under the comment it
+   answers, indented just enough to read as a response to it rather than
+   a new top-level comment, without the deep staircase indentation a
+   fully nested thread would need (there is only ever one level, see
+   apps.comments.services.create_comment). */
+.comment--reply {
+    margin-left: 2rem;
+    padding: 0.6rem 0 0.6rem 0.9rem;
+    border-bottom: none;
+    border-left: 2px solid var(--border-light);
+}
+
+.comment-list--replies .comment--reply:not(:last-child) {
+    margin-bottom: 0.6rem;
+}
+
+.comment__meta {
+    margin: 0 0 0.2rem;
+    font-size: 0.85rem;
+}
+
+.comment__author {
+    font-weight: 600;
+}
+
+.comment__date {
+    color: var(--text-secondary);
+    margin-left: 0.5rem;
+}
+
+.comment__text {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.comment__reply-toggle {
+    margin-top: 0.4rem;
+}
+
+.comment__reply-toggle summary {
+    cursor: pointer;
+    color: var(--link-color, #3366cc);
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+.comment-form {
+    margin-top: 0.6rem;
+}
+
+.comment-form textarea {
+    width: 100%;
+    max-width: none;
+    margin-bottom: 0.5rem;
+}
+
+.comment-form--new {
+    margin-top: 1rem;
+}
+
+/* ---------------------------------------------------------------- */
 /* Forms and buttons                                                 */
 /* ---------------------------------------------------------------- */
 

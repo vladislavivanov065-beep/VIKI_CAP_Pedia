@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.attachments",
     "apps.search",
     "apps.assistant",
+    "apps.comments",
     "apps.audit",
     "apps.core",
 ]
