@@ -30,7 +30,7 @@ def test_finds_the_most_topically_similar_articles_first():
         created_by=user,
     )
 
-    results = find_similar_articles(target, limit=3)
+    results = find_similar_articles(target, user=user, limit=3)
 
     assert close in results
     assert results.index(close) < (results.index(unrelated) if unrelated in results else 999)
@@ -46,7 +46,7 @@ def test_excludes_self_and_archived_articles():
     )
     services.archive_article(article_id=archived.pk, actor=user)
 
-    results = find_similar_articles(target, limit=3)
+    results = find_similar_articles(target, user=user, limit=3)
 
     assert target not in results
     assert archived not in results
@@ -59,7 +59,7 @@ def test_returns_empty_list_when_nothing_shares_meaningful_terms():
         title="Бухгалтерия", content_source="налоговая отчётность за квартал", created_by=user
     )
 
-    results = find_similar_articles(target, limit=3)
+    results = find_similar_articles(target, user=user, limit=3)
 
     assert results == []
 
@@ -70,7 +70,7 @@ def test_returns_empty_list_when_no_other_articles_exist():
         title="Единственная статья", content_source="текст", created_by=user
     )
 
-    assert find_similar_articles(target, limit=3) == []
+    assert find_similar_articles(target, user=user, limit=3) == []
 
 
 def test_respects_limit():
@@ -85,7 +85,7 @@ def test_respects_limit():
             created_by=user,
         )
 
-    results = find_similar_articles(target, limit=3)
+    results = find_similar_articles(target, user=user, limit=3)
 
     assert len(results) <= 3
 
@@ -104,7 +104,7 @@ def test_find_similar_articles_prefers_cache_over_live_computation():
     # back.
     ArticleSimilarity.objects.create(article=target, related_article=far, score=0.9, rank=1)
 
-    results = find_similar_articles(target, limit=3)
+    results = find_similar_articles(target, user=user, limit=3)
 
     assert results == [far]
     assert close not in results

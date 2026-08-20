@@ -26,6 +26,8 @@ import math
 import re
 from collections import Counter
 
+from apps.accounts.models import User
+from apps.articles import visibility
 from apps.articles.models import Article, ArticleSimilarity
 
 _TOKEN_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -255,12 +257,15 @@ def _cosine_similarity(vector_a: dict[str, float], vector_b: dict[str, float]) -
     return dot_product / (magnitude_a * magnitude_b)
 
 
-def find_similar_articles(article: Article, *, limit: int = 3) -> list[Article]:
+def find_similar_articles(article: Article, *, user: User, limit: int = 3) -> list[Article]:
     """Top ``limit`` other active articles ranked by similarity to
-    ``article``. Returns fewer than ``limit`` if there aren't enough
-    other articles, and an empty list once nothing shares any
-    meaningful term with ``article`` (a zero score is excluded rather
-    than padded with unrelated articles).
+    ``article``, that ``user`` is also allowed to see (see
+    apps.articles.visibility) -- recommending an article someone can't
+    open would be worse than recommending nothing. Returns fewer than
+    ``limit`` if there aren't enough other *visible* articles, and an
+    empty list once nothing shares any meaningful term with ``article``
+    (a zero score is excluded rather than padded with unrelated
+    articles).
 
     Reads the precomputed cache first; falls back to a live, single-article
     computation when nothing has been cached for this article yet -- which
@@ -271,22 +276,23 @@ def find_similar_articles(article: Article, *, limit: int = 3) -> list[Article]:
     """
     cached = list(
         ArticleSimilarity.objects.filter(article=article, related_article__is_archived=False)
+        .filter(visibility.visibility_filter(user, prefix="related_article__"))
         .select_related("related_article", "related_article__current_revision")
         .order_by("rank")[:limit]
     )
     if cached:
         return [entry.related_article for entry in cached]
 
-    return _compute_similar_articles_live(article, limit=limit)
+    return _compute_similar_articles_live(article, user=user, limit=limit)
 
 
-def _compute_similar_articles_live(article: Article, *, limit: int) -> list[Article]:
+def _compute_similar_articles_live(article: Article, *, user: User, limit: int) -> list[Article]:
     target_tokens = _tokenize(_plain_text(article))
     if not target_tokens:
         return []
 
     others = list(
-        Article.objects.filter(is_archived=False)
+        visibility.visible_articles(user, Article.objects.filter(is_archived=False))
         .exclude(pk=article.pk)
         .select_related("current_revision")
     )

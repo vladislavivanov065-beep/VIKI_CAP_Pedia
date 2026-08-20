@@ -38,9 +38,9 @@ class ArticleRevisionInline(admin.TabularInline):
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
     list_display = ["title", "slug", "is_archived", "version", "created_by", "updated_at"]
-    list_filter = ["is_archived", "categories", "tags"]
+    list_filter = ["is_archived", "categories", "tags", "visible_departments"]
     search_fields = ["title", "slug"]
-    filter_horizontal = ["categories", "tags"]
+    filter_horizontal = ["categories", "tags", "visible_departments"]
     readonly_fields = [
         "id",
         "title_normalized",

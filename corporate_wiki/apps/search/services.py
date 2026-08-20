@@ -21,6 +21,8 @@ import re
 from django.db.models import Q, QuerySet
 from django.utils.html import escape
 
+from apps.accounts.models import User
+from apps.articles import visibility
 from apps.articles.models import Article
 from apps.search import fts
 
@@ -55,10 +57,14 @@ def _title_tier_filters(normalized_query: str) -> list[Q]:
 
 
 def search_articles(
-    query: str, *, include_archived: bool = False, limit: int = 20
+    query: str, *, user: User, include_archived: bool = False, limit: int = 20
 ) -> list[Article]:
     """Rank matches: exact title, title starts-with, then FTS5
-    relevance (BM25) across title-contains and full content.
+    relevance (BM25) across title-contains and full content. Never
+    returns an article `user` isn't allowed to see (apps.articles.
+    visibility) -- filtered before ranking, not after, so a
+    department-restricted article can't even take up one of `limit`
+    slots for someone who wouldn't be able to open it.
     """
     query = query.strip()
     if not query:
@@ -68,6 +74,7 @@ def search_articles(
     base_qs = Article.objects.select_related("current_revision", "current_revision__edited_by")
     if not include_archived:
         base_qs = base_qs.filter(is_archived=False)
+    base_qs = visibility.visible_articles(user, base_qs)
 
     ranked = _rank_by_tiers(base_qs, _title_tier_filters(normalized_query), limit)
 
@@ -87,7 +94,7 @@ def search_articles(
 
 
 def search_with_snippets(
-    query: str, *, include_archived: bool = False, limit: int = 20
+    query: str, *, user: User, include_archived: bool = False, limit: int = 20
 ) -> list[dict]:
     """``search_articles`` results enriched with a highlighted title and
     content snippet (``<mark>``-wrapped matches, HTML-safe) for the
@@ -95,7 +102,9 @@ def search_with_snippets(
     match was in the title only (nothing in the content to highlight).
     """
     results = []
-    for article in search_articles(query, include_archived=include_archived, limit=limit):
+    for article in search_articles(
+        query, user=user, include_archived=include_archived, limit=limit
+    ):
         revision = article.current_revision
         snippet = fts.snippet_html(str(article.pk), query)
         if snippet is None:
@@ -134,14 +143,14 @@ def suggest_correction(query: str) -> str | None:
     return " ".join(corrected) if changed else None
 
 
-def search_suggestions(query: str, *, limit: int = 10) -> list[Article]:
+def search_suggestions(query: str, *, user: User, limit: int = 10) -> list[Article]:
     """Title-only ranking for the search-box autocomplete (section 8.4)."""
     query = query.strip()
     if len(query) < 2:
         return []
     normalized_query = query.lower()
 
-    base_qs = Article.objects.filter(is_archived=False)
+    base_qs = visibility.visible_articles(user, Article.objects.filter(is_archived=False))
     return _rank_by_tiers(
         base_qs,
         [

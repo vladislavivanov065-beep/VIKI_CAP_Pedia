@@ -32,8 +32,14 @@ def test_new_user_defaults_to_must_change_password_true():
     assert user.must_change_password is True
 
 
-def test_user_has_no_job_title_department_or_avatar_fields():
+def test_user_has_no_job_title_or_avatar_fields():
+    # department *is* a field (see apps.articles.visibility) -- added
+    # later, specifically for the article visibility restriction.
     field_names = {f.name for f in User._meta.get_fields()}
     assert "job_title" not in field_names
-    assert "department" not in field_names
     assert "avatar" not in field_names
+
+
+def test_new_user_defaults_to_no_department():
+    user = User.objects.create_user(username="fresh2", password="StrongPassw0rd!23")
+    assert user.department is None

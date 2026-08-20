@@ -12,7 +12,7 @@ def search_results(request):
     results = []
     suggestion = None
     if query:
-        results = search_with_snippets(query)
+        results = search_with_snippets(query, user=request.user)
         if not results:
             suggestion = suggest_correction(query)
 
@@ -27,6 +27,6 @@ def search_suggestions_view(request):
     query = request.GET.get("q", "")
     suggestions = [
         {"title": article.title, "url": reverse("articles:detail", kwargs={"slug": article.slug})}
-        for article in search_suggestions(query)
+        for article in search_suggestions(query, user=request.user)
     ]
     return JsonResponse({"suggestions": suggestions})

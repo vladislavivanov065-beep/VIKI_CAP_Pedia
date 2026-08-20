@@ -13,11 +13,13 @@ from apps.accounts.managers import UserManager
 class User(AbstractBaseUser, PermissionsMixin):
     """Custom user authenticated by username (login), not email.
 
-    Deliberately does NOT have job_title, department or avatar fields —
-    those are explicitly out of scope for this project. Usernames are
-    restricted to ASCII letters/digits/@/./+/-/_ (``ASCIIUsernameValidator``)
-    so that SQLite's ASCII-only case folding stays correct for uniqueness
-    and login lookups.
+    Deliberately does NOT have job_title or avatar fields — those are
+    explicitly out of scope for this project. `department` *is* a field
+    (see below) -- added for the article visibility restriction, not a
+    general-purpose org-chart field. Usernames are restricted to ASCII
+    letters/digits/@/./+/-/_ (``ASCIIUsernameValidator``) so that
+    SQLite's ASCII-only case folding stays correct for uniqueness and
+    login lookups.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -33,6 +35,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     must_change_password = models.BooleanField(default=True)
     password_changed_at = models.DateTimeField(null=True, blank=True)
     password_reset_by_admin_at = models.DateTimeField(null=True, blank=True)
+
+    # Which department this user belongs to, for the article visibility
+    # restriction (see apps.articles.visibility) -- editable only through
+    # Django Admin (see apps.accounts.admin.UserAdmin), same as
+    # Department itself. No department means the user only ever sees
+    # articles nobody has restricted to a department.
+    department = models.ForeignKey(
+        "departments.Department",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="users",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

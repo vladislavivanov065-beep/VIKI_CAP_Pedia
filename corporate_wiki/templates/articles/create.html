@@ -39,6 +39,12 @@
             </div>
 
             <div class="form-row">
+                {{ form.visible_departments.label_tag }}
+                {{ form.visible_departments }}
+                <p class="text-secondary">{{ form.visible_departments.help_text }}</p>
+            </div>
+
+            <div class="form-row">
                 <label id="article-editor-label">Текст статьи</label>
                 {% include "includes/wysiwyg_toolbar.html" %}
                 <div

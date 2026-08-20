@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Iterable
 
 from django.db import transaction
 from django.utils import timezone
@@ -19,6 +20,7 @@ from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
 from apps.articles.markdown_ext import render_article_content
 from apps.articles.models import Article, ArticleRedirect, ArticleRevision, Category, Tag
 from apps.audit.services import record_event
+from apps.departments.models import Department
 
 security_logger = logging.getLogger("security")
 
@@ -330,4 +332,19 @@ def set_article_taxonomy(
     tags = _get_or_create_by_name(Tag, tag_names)
     article.categories.set(categories)
     article.tags.set(tags)
+    return article
+
+
+def set_article_visible_departments(
+    *, article_id: uuid.UUID, departments: Iterable[Department]
+) -> Article:
+    """Assign which departments may view an article (see
+    apps.articles.visibility) -- empty leaves it unrestricted, visible to
+    everyone. Departments themselves are only ever created/renamed
+    through Django Admin, never on the fly here (unlike categories/tags
+    above) -- takes already-resolved Department instances (e.g. from a
+    ModelMultipleChoiceField's cleaned_data), not raw ids.
+    """
+    article = Article.objects.get(pk=article_id)
+    article.visible_departments.set(departments)
     return article

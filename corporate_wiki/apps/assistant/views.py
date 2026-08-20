@@ -5,11 +5,12 @@ import uuid
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from apps.articles import visibility
 from apps.articles.models import Article
 from apps.assistant import chunking_preferences, services, training
 from apps.assistant.exceptions import (
@@ -36,6 +37,8 @@ def ask_question(request):
         return JsonResponse({"error": "Не указана статья."}, status=400)
 
     article = get_object_or_404(Article, slug=slug, is_archived=False)
+    if not visibility.article_is_visible(article, request.user):
+        raise Http404("Статья не найдена.")
 
     try:
         if use_chatgpt:

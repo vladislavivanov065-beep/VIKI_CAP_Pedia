@@ -12,7 +12,7 @@ from apps.articles import selectors
 
 
 def home(request):
-    recent_articles = selectors.get_recent_articles(limit=10)
+    recent_articles = selectors.get_recent_articles(user=request.user, limit=10)
     return render(request, "pages/home.html", {"recent_articles": recent_articles})
 
 

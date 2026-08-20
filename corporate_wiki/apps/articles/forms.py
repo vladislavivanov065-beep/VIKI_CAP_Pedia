@@ -2,9 +2,18 @@ from __future__ import annotations
 
 from django import forms
 
+from apps.departments.models import Department
+
 
 def _split_names(raw: str) -> list[str]:
     return [name.strip() for name in raw.split(",") if name.strip()]
+
+
+_VISIBLE_DEPARTMENTS_HELP_TEXT = (
+    "Ничего не выбрано — статья видна всем. Если выбрать хотя бы одно "
+    "подразделение, статья станет видна только пользователям из "
+    "выбранных подразделений (и администраторам)."
+)
 
 
 class ArticleCreateForm(forms.Form):
@@ -24,6 +33,13 @@ class ArticleCreateForm(forms.Form):
         label="Теги",
         required=False,
         help_text="Через запятую, например: hr, отпуска, регламенты",
+    )
+    visible_departments = forms.ModelMultipleChoiceField(
+        label="Видимость по подразделениям",
+        queryset=Department.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_VISIBLE_DEPARTMENTS_HELP_TEXT,
     )
 
     def clean_categories(self) -> list[str]:
@@ -51,6 +67,13 @@ class ArticleEditForm(forms.Form):
         label="Теги",
         required=False,
         help_text="Через запятую, например: hr, отпуска, регламенты",
+    )
+    visible_departments = forms.ModelMultipleChoiceField(
+        label="Видимость по подразделениям",
+        queryset=Department.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text=_VISIBLE_DEPARTMENTS_HELP_TEXT,
     )
 
     def clean_categories(self) -> list[str]:

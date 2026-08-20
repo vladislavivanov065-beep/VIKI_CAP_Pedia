@@ -13,6 +13,7 @@ urlpatterns = [
     path("attachments/", include("apps.attachments.urls")),
     path("search/", include("apps.search.urls")),
     path("assistant/", include("apps.assistant.urls")),
+    path("comments/", include("apps.comments.urls")),
     path("admin/", admin.site.urls),
     path("health/live/", liveness, name="health-live"),
     path("health/ready/", readiness, name="health-ready"),
