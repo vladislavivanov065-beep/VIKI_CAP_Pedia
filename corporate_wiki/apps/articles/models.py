@@ -94,6 +94,13 @@ class Article(models.Model):
 
     categories = models.ManyToManyField(Category, blank=True, related_name="articles")
     tags = models.ManyToManyField(Tag, blank=True, related_name="articles")
+    # Which departments may view this article (see apps.articles.
+    # visibility) -- empty means unrestricted, visible to everyone,
+    # including a user with no department of their own. Staff always see
+    # every article regardless of this field.
+    visible_departments = models.ManyToManyField(
+        "departments.Department", blank=True, related_name="articles_restricted_to"
+    )
 
     class Meta:
         verbose_name = "статья"

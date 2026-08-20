@@ -7,7 +7,7 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from apps.articles import selectors, services
+from apps.articles import selectors, services, visibility
 from apps.articles.diffing import build_line_diff
 from apps.articles.document_import import parse_uploaded_document
 from apps.articles.exceptions import ArticleEditConflict, ArticleTitleConflict
@@ -41,6 +41,9 @@ def article_create(request):
                     category_names=form.cleaned_data["categories"],
                     tag_names=form.cleaned_data["tags"],
                 )
+                services.set_article_visible_departments(
+                    article_id=article.pk, departments=form.cleaned_data["visible_departments"]
+                )
                 messages.success(request, "Статья создана.")
                 return redirect("articles:detail", slug=article.slug)
     else:
@@ -72,10 +75,16 @@ def article_detail(request, slug: str):
         return redirect_response
     if article is None:
         raise Http404("Статья не найдена.")
+    if not visibility.article_is_visible(article, request.user):
+        raise Http404("Статья не найдена.")
 
     revision = article.current_revision
     toc_html = extract_toc_html(revision.content_html) if revision else ""
-    similar_articles = find_similar_articles(article, limit=3) if not article.is_archived else []
+    similar_articles = (
+        find_similar_articles(article, user=request.user, limit=3)
+        if not article.is_archived
+        else []
+    )
     comment_threads = comments_services.get_comment_threads(article)
 
     return render(
@@ -93,7 +102,7 @@ def article_detail(request, slug: str):
 
 
 def article_edit(request, slug: str):
-    article = get_object_or_404(Article, slug=slug, is_archived=False)
+    article = visibility.get_visible_article_or_404(slug=slug, user=request.user)
     revision = article.current_revision
 
     if request.method == "POST":
@@ -139,6 +148,9 @@ def article_edit(request, slug: str):
                     category_names=form.cleaned_data["categories"],
                     tag_names=form.cleaned_data["tags"],
                 )
+                services.set_article_visible_departments(
+                    article_id=article.pk, departments=form.cleaned_data["visible_departments"]
+                )
                 messages.success(request, "Изменения сохранены.")
                 return redirect("articles:detail", slug=article.slug)
     else:
@@ -149,6 +161,7 @@ def article_edit(request, slug: str):
                 "article_version": article.version,
                 "categories": ", ".join(category.name for category in article.categories.all()),
                 "tags": ", ".join(tag.name for tag in article.tags.all()),
+                "visible_departments": article.visible_departments.all(),
             }
         )
 
@@ -166,7 +179,7 @@ def article_link_suggestions(request):
     suggest linking a page to itself.
     """
     articles = (
-        Article.objects.filter(is_archived=False)
+        visibility.visible_articles(request.user, Article.objects.filter(is_archived=False))
         .exclude(slug=request.GET.get("exclude", ""))
         .order_by("title")
         .values("id", "title", "slug")
@@ -176,12 +189,14 @@ def article_link_suggestions(request):
 
 def article_sidebar_list(request):
     """Backs the sidebar's scrollable quick-browse/quick-search widget."""
-    articles = selectors.find_articles_for_sidebar_list(request.GET.get("q", ""))
+    articles = selectors.find_articles_for_sidebar_list(request.GET.get("q", ""), user=request.user)
     return JsonResponse({"articles": [{"title": a.title, "slug": a.slug} for a in articles]})
 
 
 def article_history(request, slug: str):
-    article = get_object_or_404(Article, slug=slug)
+    article = visibility.get_visible_article_or_404(
+        slug=slug, user=request.user, include_archived=True
+    )
     revisions = list(selectors.get_article_history(article))  # newest first
 
     entries = []
@@ -198,7 +213,9 @@ def article_history(request, slug: str):
 
 
 def article_revision_detail(request, slug: str, revision_number: int):
-    article = get_object_or_404(Article, slug=slug)
+    article = visibility.get_visible_article_or_404(
+        slug=slug, user=request.user, include_archived=True
+    )
     revision = get_object_or_404(ArticleRevision, article=article, revision_number=revision_number)
     is_current = article.current_revision_id == revision.id
     toc_html = extract_toc_html(revision.content_html)
@@ -225,7 +242,9 @@ def article_revision_detail(request, slug: str, revision_number: int):
 
 
 def article_compare(request, slug: str):
-    article = get_object_or_404(Article, slug=slug)
+    article = visibility.get_visible_article_or_404(
+        slug=slug, user=request.user, include_archived=True
+    )
 
     try:
         from_number = int(request.GET.get("from", ""))
@@ -426,7 +445,9 @@ def category_list(request):
 
 def category_detail(request, slug: str):
     category = get_object_or_404(Category, slug=slug)
-    articles = category.articles.filter(is_archived=False).order_by("title")
+    articles = visibility.visible_articles(
+        request.user, category.articles.filter(is_archived=False)
+    ).order_by("title")
     subcategories = category.children.order_by("name")
     return render(
         request,
@@ -437,5 +458,7 @@ def category_detail(request, slug: str):
 
 def tag_detail(request, slug: str):
     tag = get_object_or_404(Tag, slug=slug)
-    articles = tag.articles.filter(is_archived=False).order_by("title")
+    articles = visibility.visible_articles(
+        request.user, tag.articles.filter(is_archived=False)
+    ).order_by("title")
     return render(request, "articles/tag_detail.html", {"tag": tag, "articles": articles})

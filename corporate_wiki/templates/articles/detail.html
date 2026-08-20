@@ -52,6 +52,13 @@
             {% if revision %}автор — {{ revision.edited_by.display_name }}{% endif %}
         </p>
 
+        {% if article.visible_departments.all %}
+            <p class="text-secondary">
+                Видна только подразделениям:
+                {% for department in article.visible_departments.all %}{{ department.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </p>
+        {% endif %}
+
         {% if article.categories.all or article.tags.all %}
             <p class="taxonomy-chips">
                 {% for category in article.categories.all %}

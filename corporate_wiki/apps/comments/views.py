@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from apps.articles import visibility
 from apps.articles.models import Article
 from apps.comments import services
 from apps.comments.forms import CommentForm
@@ -14,6 +16,8 @@ from apps.comments.models import Comment
 @require_POST
 def comment_create(request, slug: str):
     article = get_object_or_404(Article, slug=slug, is_archived=False)
+    if not visibility.article_is_visible(article, request.user):
+        raise Http404("Статья не найдена.")
     form = CommentForm(request.POST)
 
     parent = None

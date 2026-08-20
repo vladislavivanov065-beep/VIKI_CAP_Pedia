@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.db.models import QuerySet
 
 from apps.accounts.models import User
+from apps.articles import visibility
 from apps.articles.models import Article, ArticleRevision
 from apps.search import fts
 
@@ -28,8 +29,9 @@ def get_revision(article: Article, revision_number: int) -> ArticleRevision:
     return article.revisions.select_related("edited_by").get(revision_number=revision_number)
 
 
-def get_recent_articles(*, limit: int = 10) -> QuerySet[Article]:
-    return Article.objects.filter(is_archived=False).order_by("-updated_at")[:limit]
+def get_recent_articles(*, user: User, limit: int = 10) -> QuerySet[Article]:
+    qs = visibility.visible_articles(user, Article.objects.filter(is_archived=False))
+    return qs.order_by("-updated_at")[:limit]
 
 
 def get_user_contributions(user: User, *, limit: int | None = None) -> QuerySet[ArticleRevision]:
@@ -41,7 +43,7 @@ def get_user_contributions(user: User, *, limit: int | None = None) -> QuerySet[
     return qs[:limit] if limit else qs
 
 
-def find_articles_for_sidebar_list(query: str = "") -> list[Article]:
+def find_articles_for_sidebar_list(query: str = "", *, user: User) -> list[Article]:
     """Backs the sidebar's quick-browse/quick-search widget: all active
     article titles when ``query`` is blank, or every article whose title
     or content matches *all* the given words -- via the FTS5 index
@@ -49,11 +51,9 @@ def find_articles_for_sidebar_list(query: str = "") -> list[Article]:
     fast as the article count grows and is Cyrillic-case-insensitive at
     the DB level.
     """
-    base_qs = (
-        Article.objects.filter(is_archived=False)
-        .select_related("current_revision")
-        .order_by("title")
-    )
+    base_qs = visibility.visible_articles(
+        user, Article.objects.filter(is_archived=False).select_related("current_revision")
+    ).order_by("title")
 
     query = query.strip()
     if not query:

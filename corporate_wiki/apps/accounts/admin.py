@@ -58,6 +58,7 @@ class AdminUserChangeForm(forms.ModelForm):
             "username",
             "first_name",
             "last_name",
+            "department",
             "is_active",
             "is_staff",
             "is_superuser",
@@ -105,12 +106,13 @@ class UserAdmin(admin.ModelAdmin):
     list_display = [
         "username",
         "display_name",
+        "department",
         "is_active",
         "is_staff",
         "must_change_password",
         "created_at",
     ]
-    list_filter = ["is_active", "is_staff", "is_superuser", "must_change_password"]
+    list_filter = ["is_active", "is_staff", "is_superuser", "must_change_password", "department"]
     search_fields = ["username", "first_name", "last_name"]
     ordering = ["username"]
     filter_horizontal = ["groups", "user_permissions"]
@@ -126,7 +128,7 @@ class UserAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {"fields": ("username",)}),
-        ("Личные данные", {"fields": ("first_name", "last_name")}),
+        ("Личные данные", {"fields": ("first_name", "last_name", "department")}),
         (
             "Права доступа",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},

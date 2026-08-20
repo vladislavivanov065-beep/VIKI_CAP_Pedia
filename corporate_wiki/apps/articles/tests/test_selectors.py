@@ -47,7 +47,7 @@ def test_get_recent_articles_excludes_archived_and_orders_by_updated():
     archived = services.create_article(title="Архивная", content_source="c", created_by=user)
     services.archive_article(article_id=archived.pk, actor=user)
 
-    recent = list(selectors.get_recent_articles(limit=10))
+    recent = list(selectors.get_recent_articles(user=user, limit=10))
     assert archived not in recent
     assert recent.index(new) < recent.index(old)
 
@@ -70,7 +70,7 @@ def test_sidebar_list_with_blank_query_returns_all_active_articles_sorted():
     archived = services.create_article(title="Архивная", content_source="x", created_by=user)
     services.archive_article(article_id=archived.pk, actor=user)
 
-    results = selectors.find_articles_for_sidebar_list("")
+    results = selectors.find_articles_for_sidebar_list("", user=user)
 
     titles = [a.title for a in results]
     assert titles == ["А-статья", "Ж-статья"]
@@ -81,7 +81,7 @@ def test_sidebar_list_filters_by_title():
     match = services.create_article(title="CardsPro", content_source="x", created_by=user)
     services.create_article(title="Отпускные правила", content_source="x", created_by=user)
 
-    results = selectors.find_articles_for_sidebar_list("cardspro")
+    results = selectors.find_articles_for_sidebar_list("cardspro", user=user)
 
     assert results == [match]
 
@@ -93,7 +93,7 @@ def test_sidebar_list_filters_by_content():
     )
     services.create_article(title="Другая статья", content_source="Обычный текст.", created_by=user)
 
-    results = selectors.find_articles_for_sidebar_list("жирафоид")
+    results = selectors.find_articles_for_sidebar_list("жирафоид", user=user)
 
     assert results == [match]
 
@@ -105,7 +105,7 @@ def test_sidebar_list_requires_all_words_to_match():
     )
     services.create_article(title="Только деньги", content_source="бюджет отдела", created_by=user)
 
-    results = selectors.find_articles_for_sidebar_list("карты деньги")
+    results = selectors.find_articles_for_sidebar_list("карты деньги", user=user)
 
     assert results == [both]
 
@@ -114,7 +114,7 @@ def test_sidebar_list_is_cyrillic_case_insensitive():
     user = UserFactory()
     match = services.create_article(title="ОТПУСКНЫЕ ПРАВИЛА", content_source="x", created_by=user)
 
-    results = selectors.find_articles_for_sidebar_list("отпускные")
+    results = selectors.find_articles_for_sidebar_list("отпускные", user=user)
 
     assert results == [match]
 
@@ -124,6 +124,6 @@ def test_sidebar_list_excludes_archived_articles():
     article = services.create_article(title="Статья про кошек", content_source="x", created_by=user)
     services.archive_article(article_id=article.pk, actor=user)
 
-    results = selectors.find_articles_for_sidebar_list("кошек")
+    results = selectors.find_articles_for_sidebar_list("кошек", user=user)
 
     assert results == []
